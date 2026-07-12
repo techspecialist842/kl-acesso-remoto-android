@@ -346,12 +346,11 @@ class ControleGestosService : AccessibilityService() {
             screenWidth,
             screenHeight,
             tipoJanela,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.OPAQUE
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -494,8 +493,7 @@ class ControleGestosService : AccessibilityService() {
         jobPrincipal?.cancel()
         jobPrincipal = null
         Handler(Looper.getMainLooper()).post { removerOverlay() }
-        stopForeground(true)
-        stopSelf()
+        stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     private fun criarCanalNotificacao() {
