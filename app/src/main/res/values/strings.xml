@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Acesso Remoto</string>
+    <string name="servico_descricao">Serviço para controle remoto do dispositivo</string>
+</resources>
