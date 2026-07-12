@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.Path
@@ -343,10 +344,10 @@ class ControleGestosService : AccessibilityService() {
         val screenHeight = displayMetrics.heightPixels
 
         val params = WindowManager.LayoutParams(
-            screenWidth,
-            screenHeight,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
             tipoJanela,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
@@ -363,6 +364,8 @@ class ControleGestosService : AccessibilityService() {
         }
 
         val view = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
+        // Force fully opaque white — belt-and-suspenders to prevent wallpaper bleed-through
+        view.setBackgroundColor(Color.WHITE)
         view.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
         view.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
 
