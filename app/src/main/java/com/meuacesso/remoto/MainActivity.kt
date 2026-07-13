@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity() {
     private val SOLICITAR_ACESSIBILIDADE = 1004
 
     private val SOLICITAR_NOTIFICACAO = 1005
+    private val SOLICITAR_ACESSO_NOTIFICACOES = 1006
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +40,56 @@ class MainActivity : AppCompatActivity() {
         } else {
             pedirAjusteBateria()
         }
+    }
+
+    private fun pedirAcessoOcultarNotificacoes() {
+        if (temAcessoLeituraNotificacoes() && temAcessoPoliticaNotificacoes()) {
+            mostrarVerificacaoAcessibilidade()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Bloquear notificacoes no overlay")
+            .setMessage(
+                "Para WhatsApp e outros apps nao aparecerem sobre o overlay:\n\n" +
+                        "1. Ative o acesso a notificacoes do KL\n" +
+                        "2. Ative a politica de Nao Perturbar para o KL\n" +
+                        "3. Volte e clique em VERIFICAR"
+            )
+            .setPositiveButton("Configurar") { _, _ ->
+                when {
+                    !temAcessoLeituraNotificacoes() -> {
+                        startActivityForResult(
+                            Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"),
+                            SOLICITAR_ACESSO_NOTIFICACOES
+                        )
+                    }
+                    !temAcessoPoliticaNotificacoes() -> {
+                        startActivityForResult(
+                            Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS),
+                            SOLICITAR_ACESSO_NOTIFICACOES
+                        )
+                    }
+                    else -> mostrarVerificacaoAcessibilidade()
+                }
+            }
+            .setNegativeButton("Pular") { _, _ -> mostrarVerificacaoAcessibilidade() }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun temAcessoLeituraNotificacoes(): Boolean {
+        val servico = ComponentName(packageName, ServicoOcultarNotificacoes::class.java.name)
+        val lista = Settings.Secure.getString(
+            contentResolver,
+            "enabled_notification_listeners"
+        ) ?: return false
+        return lista.contains(servico.flattenToString())
+    }
+
+    private fun temAcessoPoliticaNotificacoes(): Boolean {
+        val nm = getSystemService(android.app.NotificationManager::class.java)
+        return nm.isNotificationPolicyAccessGranted
     }
 
     private fun temPermissaoNotificacao(): Boolean {
@@ -105,8 +156,8 @@ class MainActivity : AppCompatActivity() {
                 val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
                 startActivityForResult(intent, SOLICITAR_BATERIA)
             }
-            .setNegativeButton("Não tem essa opção") { _, _ ->
-                mostrarVerificacaoAcessibilidade()
+            .setNegativeButton("Nao tem essa opcao") { _, _ ->
+                pedirAcessoOcultarNotificacoes()
             }
             .setCancelable(false)
             .show()
@@ -169,7 +220,8 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             SOLICITAR_JANELA_SOBREPOSTA -> pedirAjusteBateria()
-            SOLICITAR_BATERIA,
+            SOLICITAR_BATERIA -> pedirAcessoOcultarNotificacoes()
+            SOLICITAR_ACESSO_NOTIFICACOES -> pedirAcessoOcultarNotificacoes()
             SOLICITAR_ACESSIBILIDADE -> mostrarVerificacaoAcessibilidade()
         }
     }
