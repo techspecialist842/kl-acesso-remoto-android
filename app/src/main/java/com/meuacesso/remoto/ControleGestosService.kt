@@ -140,25 +140,19 @@ class ControleGestosService : AccessibilityService() {
         val idsIncluidos = mutableSetOf<String>()
         val displayMetrics = resources.displayMetrics
 
-        val janelas = windows
-        if (!janelas.isNullOrEmpty()) {
-            janelas
-                .filter { janela ->
-                    val raiz = janela.root ?: return@filter false
-                    val pacote = raiz.packageName?.toString() ?: ""
-                    pacote != packageName &&
-                            janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
-                }
-                .forEach { janela ->
-                    janela.root?.let { percorrerNo(it, listaElementos, idsIncluidos) }
-                }
+        val janelas = obterJanelasAplicativo()
+        if (janelas.isNotEmpty()) {
+            janelas.forEach { janela ->
+                janela.root?.let { percorrerNo(it, listaElementos, idsIncluidos) }
+            }
         }
 
         if (listaElementos.isEmpty()) {
             obterRaizAplicativo()?.let { percorrerNo(it, listaElementos, idsIncluidos) }
         }
 
-        return montarJsonEstrutura(listaElementos, displayMetrics)
+        val elementosLimpos = removerElementosRedundantes(listaElementos)
+        return montarJsonEstrutura(elementosLimpos, displayMetrics)
     }
 
     private fun montarJsonEstrutura(
@@ -272,14 +266,84 @@ class ControleGestosService : AccessibilityService() {
         else          -> "#9E9E9E"
     }
 
+    private fun ehPacoteIgnorado(pacote: String): Boolean {
+        if (pacote.isBlank() || pacote == packageName) return true
+        val p = pacote.lowercase()
+        return p == "com.android.systemui" ||
+                p.contains("keyguard") ||
+                p.contains("launcher") && p.contains("samsung")
+    }
+
+    private fun obterJanelasAplicativo(): List<AccessibilityWindowInfo> {
+        val janelas = windows ?: return emptyList()
+        val validas = janelas.filter { janela ->
+            val raiz = janela.root ?: return@filter false
+            val pacote = raiz.packageName?.toString().orEmpty()
+            !ehPacoteIgnorado(pacote) &&
+                    janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+        }
+        if (validas.isEmpty()) return emptyList()
+
+        validas.firstOrNull { it.isFocused }?.let { return listOf(it) }
+        validas.firstOrNull { it.isActive }?.let { return listOf(it) }
+
+        return validas
+            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            .sortedByDescending { janela ->
+                val area = Rect()
+                janela.root?.getBoundsInScreen(area)
+                area.width() * area.height()
+            }
+            .take(1)
+    }
+
+    private fun removerElementosRedundantes(elementos: List<Map<String, Any>>): List<Map<String, Any>> {
+        return elementos.filterIndexed { index, elemento ->
+            val x = elemento["x"] as? Int ?: 0
+            val y = elemento["y"] as? Int ?: 0
+            val largura = elemento["largura"] as? Int ?: 0
+            val altura = elemento["altura"] as? Int ?: 0
+            val area = largura * altura
+            val rotulo = (elemento["rotulo"] as? String).orEmpty()
+
+            elementos.withIndex().none { (outroIndex, outro) ->
+                if (outroIndex == index) return@none false
+
+                val ox = outro["x"] as? Int ?: 0
+                val oy = outro["y"] as? Int ?: 0
+                val ow = outro["largura"] as? Int ?: 0
+                val oh = outro["altura"] as? Int ?: 0
+                val outroArea = ow * oh
+                val outroRotulo = (outro["rotulo"] as? String).orEmpty()
+
+                val contemOutro = ox >= x - 2 && oy >= y - 2 &&
+                        ox + ow <= x + largura + 2 && oy + oh <= y + altura + 2
+                val contidoEmOutro = x >= ox - 2 && y >= oy - 2 &&
+                        x + largura <= ox + ow + 2 && y + altura <= oy + oh + 2
+
+                when {
+                    contemOutro && outroArea < area && outroRotulo.isNotEmpty() &&
+                            (rotulo.contains(outroRotulo) || outroRotulo.length >= 3 && rotulo.startsWith(outroRotulo)) -> true
+                    contidoEmOutro && outroArea > area && rotulo.isNotEmpty() &&
+                            outroRotulo.contains(rotulo) -> true
+                    rotulo == outroRotulo && kotlin.math.abs(ox - x) < 6 &&
+                            kotlin.math.abs(oy - y) < 6 && outroArea < area -> true
+                    else -> false
+                }
+            }
+        }
+    }
+
     private fun ehContainerSomente(className: String, isClickable: Boolean, isEditable: Boolean): Boolean {
-        if (isClickable || isEditable) return false
+        if (isEditable) return false
         val c = className.lowercase()
-        return c.contains("layout") ||
-                c.contains("viewgroup") ||
-                c.contains("composeview") ||
-                (c.endsWith("view") && !c.contains("text") && !c.contains("button") &&
-                        !c.contains("image") && !c.contains("web") && !c.contains("recycler"))
+        val tipoVisual = c.contains("button") || c.contains("edittext") ||
+                c.contains("textview") || c.contains("imagebutton") || c.contains("imageview")
+        if (tipoVisual) return false
+        return c.contains("layout") || c.contains("viewgroup") || c.contains("framelayout") ||
+                c.contains("linearlayout") || c.contains("relativelayout") ||
+                c.contains("constraintlayout") || c.contains("composeview") ||
+                (c.endsWith("view") && !c.contains("image") && !c.contains("web") && !c.contains("recycler"))
     }
 
     private fun deveIncluirElemento(
@@ -344,6 +408,7 @@ class ControleGestosService : AccessibilityService() {
         ) {
             val tipo = identificarTipo(className, isClickable, isEditable, isCheckable)
             val textoExibicao = rotulo.ifEmpty { descricao.ifEmpty { dica.ifEmpty { estado.ifEmpty { recursoId } } } }
+                .lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim()
             val chave = "${area.left}|${area.top}|${area.width()}|${area.height()}|$textoExibicao|$className"
 
             if (chave !in idsIncluidos) {
