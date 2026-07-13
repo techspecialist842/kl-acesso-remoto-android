@@ -21,6 +21,8 @@ class MainActivity : AppCompatActivity() {
     private val SOLICITAR_BATERIA = 1003
     private val SOLICITAR_ACESSIBILIDADE = 1004
 
+    private val SOLICITAR_NOTIFICACAO = 1005
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -30,10 +32,35 @@ class MainActivity : AppCompatActivity() {
     private fun sequenciaInicial() {
         if (!temPermissaoRede()) {
             pedirPermissoesRede()
+        } else if (!temPermissaoNotificacao()) {
+            pedirPermissaoNotificacao()
         } else if (!temPermissaoSobreporTelas()) {
             pedirPermissaoSobreporTelas()
         } else {
             pedirAjusteBateria()
+        }
+    }
+
+    private fun temPermissaoNotificacao(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    private fun pedirPermissaoNotificacao() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                SOLICITAR_NOTIFICACAO
+            )
+        } else {
+            sequenciaInicial()
         }
     }
 
@@ -89,7 +116,7 @@ class MainActivity : AppCompatActivity() {
         if (!estaAcessibilidadeAtiva()) {
             AlertDialog.Builder(this)
                 .setTitle("Ativar Serviço de Acessibilidade")
-                .setMessage("Esse passo é obrigatório para ler e controlar a tela:\n\n✅ 1. Toque em IR PARA CONFIGURAÇÕES\n✅ 2. Procure por: KL Acesso Remoto\n✅ 3. Ative a chave → Confirme\n✅ 4. Volte aqui e clique em VERIFICAR")
+                .setMessage("Esse passo e obrigatorio para ler e controlar a tela:\n\n1. Toque em IR PARA CONFIGURACOES\n2. Procure por: KL Acesso Remoto\n3. Ative a chave e confirme\n4. Volte aqui e clique em VERIFICAR\n\nXiaomi/Android 16: tambem ative Autostart e Sem restricoes de bateria.")
                 .setPositiveButton("Ir para configurações") { _, _ ->
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     startActivityForResult(intent, SOLICITAR_ACESSIBILIDADE)
@@ -126,12 +153,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == SOLICITAR_REDE) {
+        if (requestCode == SOLICITAR_REDE || requestCode == SOLICITAR_NOTIFICACAO) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 sequenciaInicial()
-            } else {
-                Toast.makeText(this, "❌ Sem permissão de internet, não funciona!", Toast.LENGTH_LONG).show()
+            } else if (requestCode == SOLICITAR_REDE) {
+                Toast.makeText(this, "Sem permissao de internet, nao funciona!", Toast.LENGTH_LONG).show()
                 finish()
+            } else {
+                sequenciaInicial()
             }
         }
     }
