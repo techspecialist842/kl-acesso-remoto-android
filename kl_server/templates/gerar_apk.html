@@ -111,6 +111,16 @@
         <h1>Gerar novo aplicativo</h1>
         <p>Crie um APK personalizado sem abrir o Android Studio.</p>
 
+        {% if ambiente and not ambiente.pronto %}
+        <div class="status erro" style="display:block;">
+            Servidor incompleto para gerar APK.
+            Java: {{ "OK" if ambiente.java else "FALTA" }} |
+            SDK: {{ "OK" if ambiente.android_sdk else "FALTA" }} |
+            Projeto: {{ "OK" if ambiente.projeto_android else "FALTA" }} |
+            Pillow: {{ "OK" if ambiente.pillow else "FALTA" }}
+        </div>
+        {% endif %}
+
         <form id="form-gerar-apk">
             <label for="nome_app">Nome do aplicativo</label>
             <input id="nome_app" name="nome_app" type="text" maxlength="40"

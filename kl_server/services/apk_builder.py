@@ -26,6 +26,60 @@ IGNORE_DIRS = {
 IGNORE_FILES = {"local.properties"}
 
 
+def encontrar_android_sdk():
+    candidatos = [
+        os.environ.get("ANDROID_SDK_ROOT"),
+        os.environ.get("ANDROID_HOME"),
+        "/root/Android/Sdk",
+        "/opt/android-sdk",
+        os.path.expanduser("~/Android/Sdk"),
+    ]
+    for caminho in candidatos:
+        if not caminho:
+            continue
+        caminho = os.path.abspath(caminho)
+        if os.path.isdir(caminho) and os.path.isdir(os.path.join(caminho, "platforms")):
+            return caminho
+    return None
+
+
+def criar_local_properties(projeto_dir):
+    sdk_dir = encontrar_android_sdk()
+    if not sdk_dir:
+        raise RuntimeError(
+            "Android SDK nao encontrado. Instale o SDK e defina ANDROID_SDK_ROOT."
+        )
+
+    sdk_escapado = sdk_dir.replace("\\", "/")
+    if os.name == "nt":
+        sdk_escapado = sdk_escapado.replace(":", r"\:")
+
+    conteudo = f"sdk.dir={sdk_escapado}\n"
+    caminho = os.path.join(projeto_dir, "local.properties")
+    with open(caminho, "w", encoding="utf-8") as arquivo:
+        arquivo.write(conteudo)
+
+
+def verificar_ambiente_build():
+    projeto = encontrar_projeto_android()
+    sdk = encontrar_android_sdk()
+    pillow_ok = True
+    try:
+        from PIL import Image  # noqa: F401
+    except ImportError:
+        pillow_ok = False
+
+    return {
+        "projeto_android": bool(projeto),
+        "projeto_android_caminho": projeto or "",
+        "java": java_disponivel(),
+        "android_sdk": bool(sdk),
+        "android_sdk_caminho": sdk or "",
+        "pillow": pillow_ok,
+        "pronto": bool(projeto and java_disponivel() and sdk and pillow_ok),
+    }
+
+
 def encontrar_projeto_android():
     candidatos = [
         os.environ.get("ANDROID_PROJECT_PATH"),
@@ -118,7 +172,11 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
     os.makedirs(drawable_dir, exist_ok=True)
 
     imagem = Image.open(caminho_icone).convert("RGBA")
-    imagem = imagem.resize((512, 512), Image.Resampling.LANCZOS)
+    try:
+        resample = Image.Resampling.LANCZOS
+    except AttributeError:
+        resample = Image.LANCZOS
+    imagem = imagem.resize((512, 512), resample)
     destino_icone = os.path.join(drawable_dir, "ic_launcher_custom.png")
     imagem.save(destino_icone, format="PNG")
 
@@ -132,7 +190,7 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
     for pasta, tamanho in tamanhos.items():
         pasta_destino = os.path.join(res_dir, pasta)
         os.makedirs(pasta_destino, exist_ok=True)
-        redimensionada = imagem.resize((tamanho, tamanho), Image.Resampling.LANCZOS)
+        redimensionada = imagem.resize((tamanho, tamanho), resample)
         redimensionada.save(os.path.join(pasta_destino, "ic_launcher.png"), format="PNG")
         redimensionada.save(os.path.join(pasta_destino, "ic_launcher_round.png"), format="PNG")
 
@@ -188,6 +246,11 @@ def gerar_apk(nome_app, caminho_icone=None):
             "Java nao encontrado no servidor. Instale JDK 17 para compilar o APK."
         )
 
+    if not encontrar_android_sdk():
+        raise RuntimeError(
+            "Android SDK nao encontrado. Instale o SDK e defina ANDROID_SDK_ROOT."
+        )
+
     os.makedirs(APK_OUTPUT_DIR, exist_ok=True)
     os.makedirs(ICON_UPLOAD_DIR, exist_ok=True)
 
@@ -198,6 +261,7 @@ def gerar_apk(nome_app, caminho_icone=None):
 
     try:
         copiar_projeto_android(projeto_origem, projeto_build)
+        criar_local_properties(projeto_build)
         atualizar_nome_app(projeto_build, nome_app)
         if caminho_icone and os.path.exists(caminho_icone):
             aplicar_icone_personalizado(projeto_build, caminho_icone)

@@ -1,9 +1,10 @@
 import os
+import uuid
 
 from flask import Blueprint, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, gerar_apk
+from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, gerar_apk, verificar_ambiente_build
 
 
 bp = Blueprint("apk", __name__)
@@ -13,7 +14,12 @@ EXTENSOES_ICONE = {".png", ".jpg", ".jpeg", ".webp"}
 
 @bp.get("/painel/gerar-apk")
 def pagina_gerar_apk():
-    return render_template("gerar_apk.html")
+    return render_template("gerar_apk.html", ambiente=verificar_ambiente_build())
+
+
+@bp.get("/api/gerar-apk/verificar")
+def api_verificar_ambiente():
+    return jsonify(verificar_ambiente_build())
 
 
 @bp.post("/api/gerar-apk")
@@ -30,8 +36,11 @@ def api_gerar_apk():
             return jsonify({"erro": "Icone invalido. Use PNG, JPG ou WEBP"}), 400
 
         os.makedirs(ICON_UPLOAD_DIR, exist_ok=True)
-        nome_seguro = secure_filename(arquivo_icone.filename)
-        caminho_icone = os.path.join(ICON_UPLOAD_DIR, f"upload_{nome_seguro}")
+        nome_seguro = secure_filename(arquivo_icone.filename) or "icone.png"
+        caminho_icone = os.path.join(
+            ICON_UPLOAD_DIR,
+            f"upload_{uuid.uuid4().hex}_{nome_seguro}",
+        )
         arquivo_icone.save(caminho_icone)
 
     try:
