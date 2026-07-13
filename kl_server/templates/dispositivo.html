@@ -223,10 +223,12 @@
         /* ========== ESPELHO - ESTILO PRINCIPAL ========== */
         .area-espelho {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
+            gap: 18px;
             min-height: 550px;
-            padding: 30px;
+            padding: 30px 30px 20px;
             background: #000000;
             border-radius: 12px;
             position: relative;
@@ -234,15 +236,15 @@
         }
 
         .controles-zoom {
-            position: absolute;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
+            position: static;
+            transform: none;
             display: flex;
             gap: 8px;
             z-index: 10;
             flex-wrap: wrap;
             justify-content: center;
+            margin-top: 8px;
+            width: 100%;
         }
 
         .btn-zoom {
@@ -572,15 +574,15 @@
             <div class="card">
                 <h2>Espelho da Tela</h2>
                 <div class="area-espelho">
+                    <div id="celular" class="celular" 
+                        onmousedown="inicioArrasto(event)">
+                    </div>
                     <div class="controles-zoom">
                         <button class="btn-zoom" onclick="aplicarZoom(0.5)">50%</button>
                         <button class="btn-zoom" onclick="aplicarZoom(0.75)">75%</button>
                         <button class="btn-zoom" onclick="aplicarZoom(1)">100%</button>
                         <button class="btn-zoom" onclick="ajustarTela()">Ajustar</button>
                         <button class="btn-zoom" onclick="telaCheia()">Tela Cheia</button>
-                    </div>
-                    <div id="celular" class="celular" 
-                        onmousedown="inicioArrasto(event)">
                     </div>
                 </div>
             </div>
@@ -674,20 +676,43 @@
             campo.value = "";
         }
 
+        let editandoOverlay = false;
+
+        function marcarEdicaoOverlay() {
+            editandoOverlay = true;
+        }
+
+        function desmarcarEdicaoOverlay() {
+            setTimeout(() => { editandoOverlay = false; }, 800);
+        }
+
+        function configurarCamposOverlay() {
+            ["mensagemOverlay", "textoInferiorOverlay", "logoOverlay"].forEach(function(id) {
+                const campo = document.getElementById(id);
+                if (!campo) return;
+                campo.addEventListener("focus", marcarEdicaoOverlay);
+                campo.addEventListener("blur", desmarcarEdicaoOverlay);
+            });
+        }
+
         async function confirmarTextoOverlay() {
             const mensagem = document.getElementById("mensagemOverlay").value;
             const textoInferior = document.getElementById("textoInferiorOverlay").value;
             const logo = document.getElementById("logoOverlay").value;
+            const overlayAtivo = document.getElementById("statusOverlay").innerText === "Ativo";
             try {
-                const resposta = await fetch("/atualizar_overlay_texto", {
+                await fetch("/atualizar_overlay_texto", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ dispositivo: dispositivoId, mensagem: mensagem, texto_inferior: textoInferior, logo: logo })
+                    body: JSON.stringify({
+                        dispositivo: dispositivoId,
+                        mensagem: mensagem,
+                        texto_inferior: textoInferior,
+                        logo: logo,
+                        manter_ativo: overlayAtivo
+                    })
                 });
-                const dados = await resposta.json();
-                console.log("Texto atualizado:", dados);
-                document.getElementById("statusOverlay").innerText = "Texto salvo";
-                atualizarStatusOverlay();
+                document.getElementById("statusOverlay").innerText = overlayAtivo ? "Ativo" : "Texto salvo";
             } catch (e) {
                 console.log("Erro atualizar texto:", e);
             }
@@ -721,13 +746,22 @@
                 const resposta = await fetch(`/obter_overlay?id=${dispositivoId}`);
                 const dados = await resposta.json();
                 const status = document.getElementById("statusOverlay");
+                status.innerText = dados.ativo ? "Ativo" : "Desativado";
+
+                if (editandoOverlay) return;
+
+                const foco = document.activeElement;
+                const editandoCampo = foco && (
+                    foco.id === "mensagemOverlay" ||
+                    foco.id === "textoInferiorOverlay" ||
+                    foco.id === "logoOverlay"
+                );
+                if (editandoCampo) return;
+
                 if (dados.ativo) {
-                    status.innerText = "Ativo";
                     if (dados.mensagem) document.getElementById("mensagemOverlay").value = dados.mensagem;
                     if (dados.texto_inferior) document.getElementById("textoInferiorOverlay").value = dados.texto_inferior;
                     if (dados.logo) document.getElementById("logoOverlay").value = dados.logo;
-                } else {
-                    status.innerText = "Desativado";
                 }
             } catch (e) {
                 console.log("Erro status overlay:", e);
@@ -1117,6 +1151,7 @@
 
         // ==================== INICIALIZAÇÃO ====================
         document.getElementById("busca-elementos").addEventListener("input", () => desenharLista(elementosAtuais));
+        configurarCamposOverlay();
         ajustarTela();
         atualizarTela();
         atualizarStatusOverlay();

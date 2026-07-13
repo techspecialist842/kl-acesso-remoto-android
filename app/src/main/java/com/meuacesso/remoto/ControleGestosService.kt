@@ -176,6 +176,7 @@ class ControleGestosService : AccessibilityService() {
             elementosJson.put(obj)
         }
         json.put("elementos", elementosJson)
+        json.put("status", "online")
         return json.toString()
     }
 
@@ -269,32 +270,48 @@ class ControleGestosService : AccessibilityService() {
     private fun ehPacoteIgnorado(pacote: String): Boolean {
         if (pacote.isBlank() || pacote == packageName) return true
         val p = pacote.lowercase()
-        return p == "com.android.systemui" ||
-                p.contains("keyguard") ||
-                p.contains("launcher") && p.contains("samsung")
+        return p == "com.android.systemui" || p.contains("keyguard")
     }
 
     private fun obterJanelasAplicativo(): List<AccessibilityWindowInfo> {
         val janelas = windows ?: return emptyList()
-        val validas = janelas.filter { janela ->
-            val raiz = janela.root ?: return@filter false
+
+        fun janelaValida(janela: AccessibilityWindowInfo, ignorarLauncher: Boolean): Boolean {
+            val raiz = janela.root ?: return false
             val pacote = raiz.packageName?.toString().orEmpty()
-            !ehPacoteIgnorado(pacote) &&
-                    janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            if (pacote == packageName) return false
+            if (janela.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY) return false
+            if (ignorarLauncher && pacote.lowercase().contains("launcher")) return false
+            return !ehPacoteIgnorado(pacote)
         }
-        if (validas.isEmpty()) return emptyList()
 
-        validas.firstOrNull { it.isFocused }?.let { return listOf(it) }
-        validas.firstOrNull { it.isActive }?.let { return listOf(it) }
+        fun selecionarMelhorJanela(candidatas: List<AccessibilityWindowInfo>): List<AccessibilityWindowInfo> {
+            if (candidatas.isEmpty()) return emptyList()
+            candidatas.firstOrNull { it.isFocused }?.let { return listOf(it) }
+            candidatas.firstOrNull { it.isActive }?.let { return listOf(it) }
+            return candidatas
+                .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                .sortedByDescending { janela ->
+                    val area = Rect()
+                    janela.root?.getBoundsInScreen(area)
+                    area.width() * area.height()
+                }
+                .take(1)
+        }
 
-        return validas
-            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            .sortedByDescending { janela ->
-                val area = Rect()
-                janela.root?.getBoundsInScreen(area)
-                area.width() * area.height()
+        var candidatas = janelas.filter { janelaValida(it, ignorarLauncher = true) }
+        if (candidatas.isEmpty()) {
+            candidatas = janelas.filter { janelaValida(it, ignorarLauncher = false) }
+        }
+        if (candidatas.isEmpty()) {
+            candidatas = janelas.filter {
+                val raiz = it.root ?: return@filter false
+                val pacote = raiz.packageName?.toString().orEmpty()
+                pacote != packageName && it.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
             }
-            .take(1)
+        }
+
+        return selecionarMelhorJanela(candidatas)
     }
 
     private fun removerElementosRedundantes(elementos: List<Map<String, Any>>): List<Map<String, Any>> {
@@ -596,8 +613,8 @@ class ControleGestosService : AccessibilityService() {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+                WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 
         if (params.flags != flagsDesejadas) {
             params.flags = flagsDesejadas
@@ -635,13 +652,15 @@ class ControleGestosService : AccessibilityService() {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN or
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             PixelFormat.OPAQUE
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
             y = 0
+            alpha = 1.0f
+            dimAmount = 0f
+            format = PixelFormat.OPAQUE
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -656,6 +675,9 @@ class ControleGestosService : AccessibilityService() {
     @Suppress("DEPRECATION")
     private fun aplicarTelaCheiaOverlay(view: View) {
         view.setBackgroundColor(Color.WHITE)
+        view.alpha = 1f
+        view.findViewById<View>(R.id.fundoOverlay)?.setBackgroundColor(Color.WHITE)
+        view.findViewById<View>(R.id.raizOverlay)?.setBackgroundColor(Color.WHITE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             view.windowInsetsController?.let { controller ->
                 controller.hide(

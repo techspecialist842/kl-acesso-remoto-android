@@ -86,6 +86,8 @@ def atualizar_texto():
     atual["texto_inferior"] = dados.get("texto_inferior", atual.get("texto_inferior", ""))
     if dados.get("logo"):
         atual["logo"] = dados.get("logo")
+    if dados.get("manter_ativo") or atual.get("ativo"):
+        atual["ativo"] = True
     overlays[dispositivo_id] = atual
     salvar_overlays()
     return jsonify({"status": "ok"})

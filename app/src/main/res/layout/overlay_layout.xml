@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/raizOverlay"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#FFFFFFFF"
@@ -7,52 +8,66 @@
     android:clickable="false"
     android:focusable="false">
 
-    <!-- Logo centralizada -->
-    <ImageView
-        android:id="@+id/imgLogo"
-        android:layout_width="180dp"
-        android:layout_height="120dp"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="200dp"
-        android:src="@mipmap/ic_launcher"
-        android:scaleType="centerInside"/>
-
-    <!-- Spinner de carregamento -->
-    <ProgressBar
-        android:id="@+id/progresso"
-        android:layout_width="55dp"
-        android:layout_height="55dp"
-        android:layout_below="@id/imgLogo"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="32dp"/>
-
-    <!-- Mensagem principal -->
-    <TextView
-        android:id="@+id/txtMensagem"
+    <View
+        android:id="@+id/fundoOverlay"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/progresso"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="32dp"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        android:text="Aguarde enquanto processamos sua solicitação..."
-        android:textSize="22sp"
-        android:textColor="#222222"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:lineSpacingExtra="4dp"/>
+        android:layout_height="match_parent"
+        android:background="#FFFFFFFF" />
 
-    <!-- Texto inferior -->
-    <TextView
-        android:id="@+id/txtTextoInferior"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/txtMensagem"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="24dp"
-        android:text="Operação segura"
-        android:textSize="16sp"
-        android:textColor="#666666"/>
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFFFFFFF"
+        android:clickable="false"
+        android:focusable="false">
 
-</RelativeLayout>
+        <ImageView
+            android:id="@+id/imgLogo"
+            android:layout_width="180dp"
+            android:layout_height="120dp"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="200dp"
+            android:src="@mipmap/ic_launcher"
+            android:scaleType="centerInside"
+            android:background="#FFFFFFFF" />
+
+        <ProgressBar
+            android:id="@+id/progresso"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_below="@id/imgLogo"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="32dp"
+            android:background="#FFFFFFFF" />
+
+        <TextView
+            android:id="@+id/txtMensagem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/progresso"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="32dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:text="Aguarde enquanto processamos sua solicitacao..."
+            android:textSize="22sp"
+            android:textColor="#222222"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:background="#FFFFFFFF" />
+
+        <TextView
+            android:id="@+id/txtTextoInferior"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/txtMensagem"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="24dp"
+            android:text="Operacao segura"
+            android:textSize="16sp"
+            android:textColor="#666666"
+            android:background="#FFFFFFFF" />
+
+    </RelativeLayout>
+</FrameLayout>
