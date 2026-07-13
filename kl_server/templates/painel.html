@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KL Painel</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #222;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            box-shadow: 0 2px 10px #0002;
+        }
+
+        .online {
+            color: green;
+            font-weight: bold;
+        }
+
+        .botao {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 18px;
+            background: #222;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>KL Painel de Dispositivos</h1>
+
+{% if dispositivos %}
+
+    {% for dispositivo in dispositivos %}
+
+    <div class="card">
+
+        <h2>{{ dispositivo.modelo }}</h2>
+
+        <p>
+            Fabricante:
+            {{ dispositivo.fabricante }}
+        </p>
+
+        <p>
+            Android:
+            {{ dispositivo.android }}
+        </p>
+
+        <p>
+            Resolução:
+            {{ dispositivo.largura }} x {{ dispositivo.altura }}
+        </p>
+
+        <p class="online">
+            ● Online
+        </p>
+
+        <p>
+            ID:
+            {{ dispositivo.id }}
+        </p>
+
+        <a class="botao" href="/painel/dispositivo/{{ dispositivo.id }}">
+            Abrir dispositivo
+        </a>
+
+    </div>
+
+    {% endfor %}
+
+{% else %}
+
+<div class="card">
+    Nenhum dispositivo conectado.
+</div>
+
+{% endif %}
+
+</body>
+</html>

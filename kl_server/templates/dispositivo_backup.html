@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Dispositivo KL</title>
+
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+    background:#f4f6f8;
+    padding:30px;
+}
+
+
+h1 {
+    color:#222;
+}
+
+
+.card {
+
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:20px;
+    box-shadow:0 2px 10px #0002;
+
+}
+
+
+
+/* ESPELHO */
+
+.area-espelho {
+
+    display:flex;
+    justify-content:center;
+    padding:20px;
+
+}
+
+
+
+.celular {
+
+    position:relative;
+
+    background:#111;
+
+    border-radius:35px;
+
+    overflow:hidden;
+
+    border:8px solid #222;
+
+}
+
+
+
+.elemento-espelho {
+
+    position:absolute;
+
+    overflow:hidden;
+
+    font-size:10px;
+
+    color:#111;
+
+    background:#ffffffaa;
+
+    border:1px solid #555;
+
+    padding:2px;
+
+}
+
+
+
+.elemento-espelho.botao {
+
+    background:#d9eaff;
+
+}
+
+
+
+.elemento-espelho.texto {
+
+    background:#ffffffcc;
+
+}
+
+
+
+
+
+.elemento {
+
+    background:#f5f5f5;
+
+    padding:15px;
+
+    margin-top:10px;
+
+    border-radius:10px;
+
+    border-left:5px solid #222;
+
+}
+
+
+
+.titulo {
+
+    font-weight:bold;
+
+    font-size:18px;
+
+}
+
+
+.vazio {
+
+    color:#777;
+
+}
+
+
+</style>
+
+
+</head>
+
+
+<body>
+
+
+
+<h1>Controle do Dispositivo</h1>
+
+
+
+<div class="card">
+
+
+<h2>{{ dispositivo.modelo }}</h2>
+
+
+<p>
+ID:
+{{ dispositivo.id }}
+</p>
+
+
+<p>
+Fabricante:
+{{ dispositivo.fabricante }}
+</p>
+
+
+<p>
+Android:
+{{ dispositivo.android }}
+</p>
+
+
+<p>
+Resolução:
+{{ dispositivo.largura }} x {{ dispositivo.altura }}
+</p>
+
+
+<p>
+Status:
+{{ dispositivo.status }}
+</p>
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>ESPELHO KL</h2>
+
+
+<div class="area-espelho">
+
+
+<div 
+id="celular"
+class="celular"
+>
+
+
+</div>
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>Esqueleto recebido</h2>
+
+
+<p>
+
+Total de elementos:
+
+<span id="total-elementos">
+0
+</span>
+
+
+</p>
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>Elementos da tela</h2>
+
+
+<div id="lista-elementos">
+
+
+<p class="vazio">
+Carregando elementos...
+</p>
+
+
+</div>
+
+
+</div>
+<script>
+
+
+const dispositivoId = "{{ dispositivo.id }}";
+
+const larguraOriginal = {{ dispositivo.largura }};
+const alturaOriginal = {{ dispositivo.altura }};
+
+
+const escala = 0.35;
+
+
+
+async function atualizarTela(){
+
+
+    try {
+
+
+        const resposta = await fetch(
+            "/api/esqueleto/" + dispositivoId
+        );
+
+
+        const dados = await resposta.json();
+
+
+        const elementos = dados.elementos || [];
+
+
+
+        document.getElementById(
+            "total-elementos"
+        ).innerText = elementos.length;
+
+
+
+        desenharEspelho(elementos);
+
+
+        desenharLista(elementos);
+
+
+
+    } catch(e) {
+
+
+        console.log(
+            "Erro atualização:",
+            e
+        );
+
+
+    }
+
+
+}
+
+
+
+
+function desenharEspelho(elementos){
+
+
+
+    const celular = document.getElementById(
+        "celular"
+    );
+
+
+
+    celular.style.width =
+        (larguraOriginal * escala) + "px";
+
+
+    celular.style.height =
+        (alturaOriginal * escala) + "px";
+
+
+
+    celular.innerHTML = "";
+
+
+
+
+    elementos.forEach(elemento => {
+
+
+
+        const div = document.createElement(
+            "div"
+        );
+
+
+
+        div.className =
+            "elemento-espelho";
+
+
+
+        if(elemento.tipo === "botao"){
+            div.classList.add("botao");
+        }
+
+
+        if(elemento.tipo === "texto"){
+            div.classList.add("texto");
+        }
+
+
+
+
+        div.style.left =
+            (elemento.x * escala) + "px";
+
+
+        div.style.top =
+            (elemento.y * escala) + "px";
+
+
+
+        div.style.width =
+            (elemento.largura * escala) + "px";
+
+
+
+        div.style.height =
+            (elemento.altura * escala) + "px";
+
+
+
+
+        div.innerText =
+            elemento.texto || "";
+
+
+
+        celular.appendChild(div);
+
+
+
+    });
+
+
+
+}
+
+
+
+
+function desenharLista(elementos){
+
+
+    let html = "";
+
+
+
+    if(elementos.length === 0){
+
+
+        html = `
+
+        <p class="vazio">
+        Nenhum elemento encontrado.
+        </p>
+
+        `;
+
+
+    } else {
+
+
+
+        elementos.forEach(elemento => {
+
+
+
+            html += `
+
+
+            <div class="elemento">
+
+
+            <p class="titulo">
+            ${elemento.tipo}
+            </p>
+
+
+
+            <p>
+            Texto:
+            ${elemento.texto}
+            </p>
+
+
+
+            <p>
+            Posição:
+            X ${elemento.x}
+            |
+            Y ${elemento.y}
+            </p>
+
+
+
+            <p>
+            Tamanho:
+            ${elemento.largura}
+            x
+            ${elemento.altura}
+            </p>
+
+
+
+            </div>
+
+
+            `;
+
+
+
+        });
+
+
+
+    }
+
+
+
+    document.getElementById(
+        "lista-elementos"
+    ).innerHTML = html;
+
+
+
+}
+
+
+
+
+atualizarTela();
+
+
+
+setInterval(
+    atualizarTela,
+    1000
+);
+
+
+
+</script>
+
+
+</body>
+
+</html>

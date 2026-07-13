@@ -1,0 +1,22 @@
+{
+    "TP1A.220624.014": {
+        "id": "TP1A.220624.014",
+        "modelo": "SM-A325M",
+        "fabricante": "samsung",
+        "android": "13",
+        "largura": 1080,
+        "altura": 2194,
+        "status": "online",
+        "ultimo_contato": 1783743550
+    },
+    "TKQ1.221114.001": {
+        "id": "TKQ1.221114.001",
+        "modelo": "2312DRA50G",
+        "fabricante": "Xiaomi",
+        "android": "13",
+        "largura": 1220,
+        "altura": 2466,
+        "status": "online",
+        "ultimo_contato": 1783741451
+    }
+}

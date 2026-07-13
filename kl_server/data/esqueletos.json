@@ -1,0 +1,645 @@
+{
+    "TP1A.220624.014": {
+        "id": "TP1A.220624.014",
+        "modelo": "SM-A325M",
+        "fabricante": "samsung",
+        "android": "13",
+        "largura": 1080,
+        "altura": 2194,
+        "densidade": 420,
+        "elementos": [
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1080,
+                "altura": 2400
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1080,
+                "altura": 2400
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1080,
+                "altura": 2400
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1080,
+                "altura": 2400
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1080,
+                "altura": 2400
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1080,
+                "altura": 2400
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Lista de apps",
+                "x": 508,
+                "y": 1856,
+                "largura": 63,
+                "altura": 63
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1080,
+                "altura": 2400
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 21,
+                "y": 101,
+                "largura": 1038,
+                "altura": 1755
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 35,
+                "y": 101,
+                "largura": 1010,
+                "altura": 1755
+            },
+            {
+                "tipo": "texto",
+                "texto": "KL Acesso Remoto",
+                "descricao": "KL Acesso Remoto",
+                "x": 35,
+                "y": 101,
+                "largura": 202,
+                "altura": 351
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 1856,
+                "largura": 1080,
+                "altura": 63
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 1919,
+                "largura": 1080,
+                "altura": 481
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 1919,
+                "largura": 1080,
+                "altura": 481
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 35,
+                "y": 1940,
+                "largura": 1010,
+                "altura": 210
+            },
+            {
+                "tipo": "texto",
+                "texto": "WA Business",
+                "descricao": "WA Business",
+                "x": 35,
+                "y": 1940,
+                "largura": 202,
+                "altura": 210
+            }
+        ]
+    },
+    "TKQ1.221114.001": {
+        "id": "TKQ1.221114.001",
+        "modelo": "2312DRA50G",
+        "fabricante": "Xiaomi",
+        "android": "13",
+        "largura": 1220,
+        "altura": 2466,
+        "densidade": 480,
+        "elementos": [
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 0,
+                "largura": 1220,
+                "altura": 2712
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Navegador Mi,Desbloqueado",
+                "x": 54,
+                "y": 796,
+                "largura": 529,
+                "altura": 1225
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 54,
+                "y": 796,
+                "largura": 529,
+                "altura": 1225
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 54,
+                "y": 796,
+                "largura": 529,
+                "altura": 110
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 65,
+                "y": 796,
+                "largura": 508,
+                "altura": 110
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Abrir informações sobre o app Navegador Mi.",
+                "x": 65,
+                "y": 796,
+                "largura": 110,
+                "altura": 110
+            },
+            {
+                "tipo": "texto",
+                "texto": "Centro de Conteúdos",
+                "descricao": "",
+                "x": 175,
+                "y": 796,
+                "largura": 323,
+                "altura": 110
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Bradesco,Desbloqueado",
+                "x": 637,
+                "y": 796,
+                "largura": 529,
+                "altura": 1225
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 637,
+                "y": 796,
+                "largura": 529,
+                "altura": 1225
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 637,
+                "y": 796,
+                "largura": 529,
+                "altura": 1225
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 637,
+                "y": 796,
+                "largura": 529,
+                "altura": 110
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 648,
+                "y": 796,
+                "largura": 508,
+                "altura": 110
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Abrir informações sobre o app Bradesco.",
+                "x": 648,
+                "y": 796,
+                "largura": 110,
+                "altura": 110
+            },
+            {
+                "tipo": "texto",
+                "texto": "Bradesco",
+                "descricao": "",
+                "x": 758,
+                "y": 796,
+                "largura": 164,
+                "altura": 110
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "WhatsApp,Desbloqueado",
+                "x": 54,
+                "y": 2131,
+                "largura": 529,
+                "altura": 581
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 54,
+                "y": 2131,
+                "largura": 529,
+                "altura": 581
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 54,
+                "y": 2131,
+                "largura": 529,
+                "altura": 110
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 65,
+                "y": 2131,
+                "largura": 508,
+                "altura": 110
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Abrir informações sobre o app WhatsApp.",
+                "x": 65,
+                "y": 2131,
+                "largura": 110,
+                "altura": 110
+            },
+            {
+                "tipo": "texto",
+                "texto": "WhatsApp",
+                "descricao": "",
+                "x": 175,
+                "y": 2131,
+                "largura": 178,
+                "altura": 110
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Chrome,Desbloqueado",
+                "x": 637,
+                "y": 2131,
+                "largura": 529,
+                "altura": 581
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 637,
+                "y": 2131,
+                "largura": 529,
+                "altura": 581
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 637,
+                "y": 2131,
+                "largura": 529,
+                "altura": 110
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 648,
+                "y": 2131,
+                "largura": 508,
+                "altura": 110
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Abrir informações sobre o app Chrome.",
+                "x": 648,
+                "y": 2131,
+                "largura": 110,
+                "altura": 110
+            },
+            {
+                "tipo": "texto",
+                "texto": "Chrome",
+                "descricao": "",
+                "x": 758,
+                "y": 2131,
+                "largura": 139,
+                "altura": 110
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 104,
+                "largura": 1220,
+                "altura": 2466
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 104,
+                "largura": 1220,
+                "altura": 209
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 104,
+                "largura": 1220,
+                "altura": 209
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 104,
+                "largura": 551,
+                "altura": 209
+            },
+            {
+                "tipo": "texto",
+                "texto": "Janelas flutuantes",
+                "descricao": "",
+                "x": 48,
+                "y": 158,
+                "largura": 455,
+                "altura": 101
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 54,
+                "y": 284,
+                "largura": 1112,
+                "altura": 314
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "",
+                "x": 54,
+                "y": 284,
+                "largura": 278,
+                "altura": 266
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 133,
+                "y": 320,
+                "largura": 120,
+                "altura": 120
+            },
+            {
+                "tipo": "texto",
+                "texto": "Limpeza",
+                "descricao": "",
+                "x": 115,
+                "y": 458,
+                "largura": 155,
+                "altura": 56
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "",
+                "x": 332,
+                "y": 284,
+                "largura": 278,
+                "altura": 314
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 411,
+                "y": 320,
+                "largura": 120,
+                "altura": 120
+            },
+            {
+                "tipo": "texto",
+                "texto": "Verificar segurança",
+                "descricao": "",
+                "x": 347,
+                "y": 458,
+                "largura": 248,
+                "altura": 104
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "",
+                "x": 610,
+                "y": 284,
+                "largura": 278,
+                "altura": 314
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 689,
+                "y": 320,
+                "largura": 120,
+                "altura": 120
+            },
+            {
+                "tipo": "texto",
+                "texto": "Encontrar apps",
+                "descricao": "",
+                "x": 625,
+                "y": 458,
+                "largura": 248,
+                "altura": 104
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "",
+                "x": 888,
+                "y": 284,
+                "largura": 278,
+                "altura": 266
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 967,
+                "y": 320,
+                "largura": 120,
+                "altura": 120
+            },
+            {
+                "tipo": "texto",
+                "texto": "Jogos",
+                "descricao": "",
+                "x": 970,
+                "y": 458,
+                "largura": 113,
+                "altura": 56
+            },
+            {
+                "tipo": "outro",
+                "texto": "",
+                "descricao": "",
+                "x": 0,
+                "y": 2241,
+                "largura": 1220,
+                "altura": 329
+            },
+            {
+                "tipo": "clicavel",
+                "texto": "",
+                "descricao": "Total de RAM: 12.0+6,0 GB | RAM disponível: 7.9 GB. Toque duas vezes para limpar.",
+                "x": 479,
+                "y": 2247,
+                "largura": 262,
+                "altura": 262
+            }
+        ]
+    }
+}
