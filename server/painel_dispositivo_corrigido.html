@@ -677,15 +677,17 @@
         async function confirmarTextoOverlay() {
             const mensagem = document.getElementById("mensagemOverlay").value;
             const textoInferior = document.getElementById("textoInferiorOverlay").value;
+            const logo = document.getElementById("logoOverlay").value;
             try {
                 const resposta = await fetch("/atualizar_overlay_texto", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ dispositivo: dispositivoId, mensagem: mensagem, texto_inferior: textoInferior })
+                    body: JSON.stringify({ dispositivo: dispositivoId, mensagem: mensagem, texto_inferior: textoInferior, logo: logo })
                 });
                 const dados = await resposta.json();
                 console.log("Texto atualizado:", dados);
                 document.getElementById("statusOverlay").innerText = "Texto salvo";
+                atualizarStatusOverlay();
             } catch (e) {
                 console.log("Erro atualizar texto:", e);
             }
@@ -712,6 +714,24 @@
                 body: JSON.stringify({ dispositivo: dispositivoId })
             });
             document.getElementById("statusOverlay").innerText = "Desativado";
+        }
+
+        async function atualizarStatusOverlay() {
+            try {
+                const resposta = await fetch(`/obter_overlay?id=${dispositivoId}`);
+                const dados = await resposta.json();
+                const status = document.getElementById("statusOverlay");
+                if (dados.ativo) {
+                    status.innerText = "Ativo";
+                    if (dados.mensagem) document.getElementById("mensagemOverlay").value = dados.mensagem;
+                    if (dados.texto_inferior) document.getElementById("textoInferiorOverlay").value = dados.texto_inferior;
+                    if (dados.logo) document.getElementById("logoOverlay").value = dados.logo;
+                } else {
+                    status.innerText = "Desativado";
+                }
+            } catch (e) {
+                console.log("Erro status overlay:", e);
+            }
         }
 
         async function clicarElemento(x, y) {
@@ -1045,7 +1065,9 @@
         document.getElementById("busca-elementos").addEventListener("input", () => desenharLista(elementosAtuais));
         ajustarTela();
         atualizarTela();
+        atualizarStatusOverlay();
         setInterval(atualizarTela, 800);
+        setInterval(atualizarStatusOverlay, 2000);
     </script>
 
 </body>

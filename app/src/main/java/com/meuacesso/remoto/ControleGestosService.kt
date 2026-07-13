@@ -19,7 +19,10 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.graphics.BitmapFactory
+import android.util.DisplayMetrics
 import android.view.View
+import android.widget.ImageView
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -44,6 +47,7 @@ class ControleGestosService : AccessibilityService() {
         const val URL_ENVIAR_ESTRUTURA = "${URL_VPS}/receber_esqueleto"
         const val URL_BUSCAR_COMANDOS = "${URL_VPS}/obter_comando"
         const val URL_BUSCAR_OVERLAY = "${URL_VPS}/obter_overlay"
+        const val URL_LOGO_OVERLAY = "${URL_VPS}/logo_overlay"
 
         private const val INTERVALO_ATUALIZACAO = 1000L
         private const val CANAL_NOTIFICACAO = "servico_controle_remoto"
@@ -502,6 +506,9 @@ class ControleGestosService : AccessibilityService() {
 
             overlayView!!.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
             overlayView!!.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
+            aplicarLogoNoOverlay(overlayView!!, logo)
+            aplicarTelaCheiaOverlay(overlayView!!)
+            garantirDimensoesOverlay()
             mensagemOverlayAtual = mensagem
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
@@ -536,6 +543,117 @@ class ControleGestosService : AccessibilityService() {
                 Log.w("KL", "Erro ao atualizar flags do overlay: ${e.message}")
             }
         }
+        aplicarTelaCheiaOverlay(view)
+        garantirDimensoesOverlay()
+    }
+
+    private fun obterDimensoesTela(): Pair<Int, Int> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.currentWindowMetrics.bounds
+            bounds.width() to bounds.height()
+        } else {
+            val metrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.getRealMetrics(metrics)
+            metrics.widthPixels to metrics.heightPixels
+        }
+    }
+
+    private fun criarParametrosOverlay(tipoJanela: Int): WindowManager.LayoutParams {
+        val (largura, altura) = obterDimensoesTela()
+        return WindowManager.LayoutParams(
+            largura,
+            altura,
+            tipoJanela,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            PixelFormat.OPAQUE
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                setFitInsetsSides(0)
+                setFitInsetsTypes(0)
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun aplicarTelaCheiaOverlay(view: View) {
+        view.setBackgroundColor(Color.WHITE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            view.windowInsetsController?.let { controller ->
+                controller.hide(
+                    android.view.WindowInsets.Type.statusBars() or
+                            android.view.WindowInsets.Type.navigationBars()
+                )
+                controller.systemBarsBehavior =
+                    android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            view.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
+        }
+    }
+
+    private fun garantirDimensoesOverlay() {
+        val view = overlayView ?: return
+        val params = parametrosOverlay ?: return
+        val (largura, altura) = obterDimensoesTela()
+        if (params.width != largura || params.height != altura) {
+            params.width = largura
+            params.height = altura
+            try {
+                windowManager.updateViewLayout(view, params)
+                parametrosOverlay = params
+            } catch (e: Exception) {
+                Log.w("KL", "Erro ao redimensionar overlay: ${e.message}")
+            }
+        }
+    }
+
+    private fun aplicarLogoNoOverlay(view: View, logo: String) {
+        val imgLogo = view.findViewById<ImageView>(R.id.imgLogo) ?: return
+        if (logo.isBlank()) {
+            imgLogo.setImageResource(R.mipmap.ic_launcher)
+            return
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            var conexao: HttpURLConnection? = null
+            try {
+                val urlLogo = if (logo.startsWith("http")) logo else "$URL_LOGO_OVERLAY/$logo"
+                conexao = URL(urlLogo).openConnection() as HttpURLConnection
+                conexao.connectTimeout = 4000
+                conexao.readTimeout = 4000
+                val bitmap = BitmapFactory.decodeStream(conexao.inputStream)
+                if (bitmap != null) {
+                    Handler(Looper.getMainLooper()).post {
+                        imgLogo.setImageBitmap(bitmap)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("KL", "Logo overlay indisponivel: ${e.message}")
+            } finally {
+                conexao?.disconnect()
+            }
+        }
     }
 
     private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
@@ -551,34 +669,16 @@ class ControleGestosService : AccessibilityService() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            tipoJanela,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-            PixelFormat.OPAQUE
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 0
-            y = 0
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                layoutInDisplayCutoutMode =
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
-        }
+        val params = criarParametrosOverlay(tipoJanela)
 
         val view = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
-        view.setBackgroundColor(Color.WHITE)
+        aplicarTelaCheiaOverlay(view)
         view.isClickable = false
         view.isFocusable = false
         view.isFocusableInTouchMode = false
         view.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
         view.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
+        aplicarLogoNoOverlay(view, logo)
 
         try {
             windowManager.addView(view, params)
