@@ -20,6 +20,8 @@ import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.graphics.BitmapFactory
+import android.graphics.drawable.ColorDrawable
+import android.widget.FrameLayout
 import android.util.DisplayMetrics
 import android.view.View
 import android.widget.ImageView
@@ -56,6 +58,7 @@ class ControleGestosService : AccessibilityService() {
 
     private var jobPrincipal: Job? = null
     private var overlayView: View? = null
+    private var overlayFundoView: View? = null
     private var parametrosOverlay: WindowManager.LayoutParams? = null
     private lateinit var windowManager: WindowManager
 
@@ -612,7 +615,6 @@ class ControleGestosService : AccessibilityService() {
         val flagsDesejadas = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_FULLSCREEN or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 
@@ -641,8 +643,26 @@ class ControleGestosService : AccessibilityService() {
         }
     }
 
+    private fun fabricantePrecisaOverlayOpaco(): Boolean {
+        val marca = Build.MANUFACTURER.lowercase()
+        return marca.contains("xiaomi") || marca.contains("redmi") || marca.contains("poco") ||
+                marca.contains("samsung") || marca.contains("huawei") || marca.contains("oppo") ||
+                marca.contains("vivo") || marca.contains("realme")
+    }
+
+    private fun aplicarOpacidadeForcada(view: View) {
+        view.setBackgroundColor(Color.WHITE)
+        view.background = ColorDrawable(Color.WHITE)
+        view.alpha = 1f
+        view.elevation = 0f
+        if (fabricantePrecisaOverlayOpaco()) {
+            view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        }
+    }
+
     private fun criarParametrosOverlay(tipoJanela: Int): WindowManager.LayoutParams {
         val (largura, altura) = obterDimensoesTela()
+        val formato = if (fabricantePrecisaOverlayOpaco()) PixelFormat.RGB_565 else PixelFormat.OPAQUE
         return WindowManager.LayoutParams(
             largura,
             altura,
@@ -650,17 +670,17 @@ class ControleGestosService : AccessibilityService() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
-            PixelFormat.OPAQUE
+            formato
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
             y = 0
             alpha = 1.0f
             dimAmount = 0f
-            format = PixelFormat.OPAQUE
+            screenBrightness = 1.0f
+            this.format = formato
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -674,10 +694,9 @@ class ControleGestosService : AccessibilityService() {
 
     @Suppress("DEPRECATION")
     private fun aplicarTelaCheiaOverlay(view: View) {
-        view.setBackgroundColor(Color.WHITE)
-        view.alpha = 1f
-        view.findViewById<View>(R.id.fundoOverlay)?.setBackgroundColor(Color.WHITE)
-        view.findViewById<View>(R.id.raizOverlay)?.setBackgroundColor(Color.WHITE)
+        aplicarOpacidadeForcada(view)
+        view.findViewById<View>(R.id.fundoOverlay)?.let { aplicarOpacidadeForcada(it) }
+        view.findViewById<View>(R.id.raizOverlay)?.let { aplicarOpacidadeForcada(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             view.windowInsetsController?.let { controller ->
                 controller.hide(
@@ -700,19 +719,20 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun garantirDimensoesOverlay() {
-        val view = overlayView ?: return
-        val params = parametrosOverlay ?: return
         val (largura, altura) = obterDimensoesTela()
-        if (params.width != largura || params.height != altura) {
+        fun atualizar(view: View?, params: WindowManager.LayoutParams?) {
+            if (view == null || params == null) return
+            if (params.width == largura && params.height == altura) return
             params.width = largura
             params.height = altura
             try {
                 windowManager.updateViewLayout(view, params)
-                parametrosOverlay = params
             } catch (e: Exception) {
                 Log.w("KL", "Erro ao redimensionar overlay: ${e.message}")
             }
         }
+        atualizar(overlayFundoView, overlayFundoView?.layoutParams as? WindowManager.LayoutParams)
+        atualizar(overlayView, parametrosOverlay)
     }
 
     private fun aplicarLogoNoOverlay(view: View, logo: String) {
@@ -758,27 +778,38 @@ class ControleGestosService : AccessibilityService() {
 
         val params = criarParametrosOverlay(tipoJanela)
 
-        val view = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
-        aplicarTelaCheiaOverlay(view)
-        view.isClickable = false
-        view.isFocusable = false
-        view.isFocusableInTouchMode = false
-        view.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
-        view.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
-        aplicarLogoNoOverlay(view, logo)
-
         try {
-            windowManager.addView(view, params)
+            if (fabricantePrecisaOverlayOpaco()) {
+                val fundo = View(this)
+                aplicarOpacidadeForcada(fundo)
+                fundo.isClickable = false
+                fundo.isFocusable = false
+                windowManager.addView(fundo, params)
+                overlayFundoView = fundo
+            }
+
+            val view = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
+            aplicarTelaCheiaOverlay(view)
+            view.isClickable = false
+            view.isFocusable = false
+            view.isFocusableInTouchMode = false
+            view.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
+            view.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
+            aplicarLogoNoOverlay(view, logo)
+
+            val paramsConteudo = criarParametrosOverlay(tipoJanela)
+            windowManager.addView(view, paramsConteudo)
             overlayView = view
-            parametrosOverlay = params
+            parametrosOverlay = paramsConteudo
             overlayAtivo = true
             mensagemOverlayAtual = mensagem
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
-            Log.i("KL", "Overlay criado — $mensagem")
+            Log.i("KL", "Overlay criado — $mensagem (${Build.MANUFACTURER})")
         } catch (e: Exception) {
             Log.e("KL", "Erro ao criar overlay: ${e.message}")
             resetarEstadoOverlay()
+            removerOverlay()
         }
     }
 
@@ -790,7 +821,15 @@ class ControleGestosService : AccessibilityService() {
                 Log.w("KL", "Erro ao remover overlay: ${e.message}")
             }
         }
+        overlayFundoView?.let { view ->
+            try {
+                windowManager.removeView(view)
+            } catch (e: Exception) {
+                Log.w("KL", "Erro ao remover fundo overlay: ${e.message}")
+            }
+        }
         overlayView = null
+        overlayFundoView = null
         parametrosOverlay = null
         resetarEstadoOverlay()
         Log.i("KL", "Overlay removido")

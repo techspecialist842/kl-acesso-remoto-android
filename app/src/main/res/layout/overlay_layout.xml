@@ -31,13 +31,17 @@
             android:scaleType="centerInside"
             android:background="#FFFFFFFF" />
 
-        <ProgressBar
+        <TextView
             android:id="@+id/progresso"
-            android:layout_width="55dp"
-            android:layout_height="55dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_below="@id/imgLogo"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="32dp"
+            android:text="..."
+            android:textSize="32sp"
+            android:textColor="#2196F3"
+            android:textStyle="bold"
             android:background="#FFFFFFFF" />
 
         <TextView
