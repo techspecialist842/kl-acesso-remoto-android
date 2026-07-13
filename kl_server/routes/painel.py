@@ -19,7 +19,18 @@ def index():
 @bp.get("/painel/dispositivo/<id>")
 def dispositivo(id):
 
-    dados = dispositivos.get(id, {})
+    dados = dispositivos.get(id)
+    if not dados:
+        dados = {
+            "id": id,
+            "modelo": "Desconhecido",
+            "fabricante": "",
+            "android": "",
+            "largura": 1080,
+            "altura": 2400,
+            "status": "offline",
+        }
+
     esqueleto = esqueletos.get(id, {})
 
     return render_template(

