@@ -5,6 +5,7 @@ from routes.esqueleto import bp as esqueleto_bp
 from routes.comandos import bp as comandos_bp
 from routes.painel import bp as painel_bp
 from routes.overlay import bp as overlay_bp
+from routes.apk import bp as apk_bp
 
 
 app = Flask(__name__)
@@ -15,6 +16,7 @@ app.register_blueprint(esqueleto_bp)
 app.register_blueprint(comandos_bp)
 app.register_blueprint(painel_bp)
 app.register_blueprint(overlay_bp)
+app.register_blueprint(apk_bp)
 
 
 @app.get("/")
