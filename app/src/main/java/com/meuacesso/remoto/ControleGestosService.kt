@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.Path
+import kotlin.math.sqrt
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -188,15 +189,21 @@ class ControleGestosService : AccessibilityService() {
                 listaElementos.add(
                     mapOf(
                         "tipo"       to tipo,
+                        "type"       to tipo,
+                        "classe"     to className,
                         "cor"        to cor,
                         "texto"      to texto,
+                        "text"       to texto,
                         "descricao"  to descricao,
                         "dica"       to dica,
                         "recurso_id" to recursoId,
+                        "viewId"     to recursoId,
                         "x"          to area.left,
                         "y"          to area.top,
                         "largura"    to area.width(),
                         "altura"     to area.height(),
+                        "width"      to area.width(),
+                        "height"     to area.height(),
                         "clicavel"   to isClickable,
                         "editavel"   to isEditable,
                         "senha"      to isPassword,
@@ -511,14 +518,34 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun executarArrasto(x1: Float, y1: Float, x2: Float, y2: Float) {
+        val dx = x2 - x1
+        val dy = y2 - y1
+        val distancia = sqrt(dx * dx + dy * dy)
+
+        if (distancia < 8f) {
+            executarToque(x2, y2)
+            return
+        }
+
+        val duracao = (distancia * 1.8f).toLong().coerceIn(350L, 1400L)
         val caminho = Path().apply {
             moveTo(x1, y1)
             lineTo(x2, y2)
         }
         val gesto = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(caminho, 0L, 600L))
+            .addStroke(GestureDescription.StrokeDescription(caminho, 0L, duracao))
             .build()
-        dispatchGesture(gesto, null, null)
+
+        Log.d("KL", "Arrasto: ($x1,$y1)->($x2,$y2) dist=$distancia dur=${duracao}ms")
+        dispatchGesture(gesto, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                Log.d("KL", "Arrasto concluído")
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                Log.w("KL", "Arrasto cancelado")
+            }
+        }, null)
     }
 
     private fun inserirTexto(texto: String) {
