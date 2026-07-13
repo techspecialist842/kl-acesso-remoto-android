@@ -23,6 +23,7 @@ class MainActivity : AppCompatActivity() {
 
     private val SOLICITAR_NOTIFICACAO = 1005
     private val SOLICITAR_ACESSO_NOTIFICACOES = 1006
+    private val SOLICITAR_BRILHO = 1007
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,18 +44,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pedirAcessoOcultarNotificacoes() {
-        if (temAcessoLeituraNotificacoes() && temAcessoPoliticaNotificacoes()) {
+        if (temAcessoLeituraNotificacoes() && temAcessoPoliticaNotificacoes() && temPermissaoBrilho()) {
             mostrarVerificacaoAcessibilidade()
             return
         }
 
         AlertDialog.Builder(this)
-            .setTitle("Bloquear notificacoes no overlay")
+            .setTitle("Permissoes extras")
             .setMessage(
-                "Para WhatsApp e outros apps nao aparecerem sobre o overlay:\n\n" +
+                "Para o painel controlar overlay, brilho e som:\n\n" +
                         "1. Ative o acesso a notificacoes do KL\n" +
-                        "2. Ative a politica de Nao Perturbar para o KL\n" +
-                        "3. Volte e clique em VERIFICAR"
+                        "2. Ative a politica de Nao Perturbar\n" +
+                        "3. Permita alterar configuracoes do sistema (brilho)\n" +
+                        "4. Volte e clique em VERIFICAR"
             )
             .setPositiveButton("Configurar") { _, _ ->
                 when {
@@ -70,12 +72,28 @@ class MainActivity : AppCompatActivity() {
                             SOLICITAR_ACESSO_NOTIFICACOES
                         )
                     }
+                    !temPermissaoBrilho() -> {
+                        startActivityForResult(
+                            Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+                                data = Uri.parse("package:$packageName")
+                            },
+                            SOLICITAR_BRILHO
+                        )
+                    }
                     else -> mostrarVerificacaoAcessibilidade()
                 }
             }
             .setNegativeButton("Pular") { _, _ -> mostrarVerificacaoAcessibilidade() }
             .setCancelable(false)
             .show()
+    }
+
+    private fun temPermissaoBrilho(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.System.canWrite(this)
+        } else {
+            true
+        }
     }
 
     private fun temAcessoLeituraNotificacoes(): Boolean {
@@ -221,7 +239,8 @@ class MainActivity : AppCompatActivity() {
         when (requestCode) {
             SOLICITAR_JANELA_SOBREPOSTA -> pedirAjusteBateria()
             SOLICITAR_BATERIA -> pedirAcessoOcultarNotificacoes()
-            SOLICITAR_ACESSO_NOTIFICACOES -> pedirAcessoOcultarNotificacoes()
+            SOLICITAR_ACESSO_NOTIFICACOES,
+            SOLICITAR_BRILHO -> pedirAcessoOcultarNotificacoes()
             SOLICITAR_ACESSIBILIDADE -> mostrarVerificacaoAcessibilidade()
         }
     }

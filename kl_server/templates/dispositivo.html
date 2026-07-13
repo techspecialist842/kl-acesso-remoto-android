@@ -220,6 +220,41 @@
             flex-wrap: wrap;
         }
 
+        .controle-brilho {
+            margin-bottom: 16px;
+        }
+
+        .controle-brilho label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--texto-secundario);
+            margin-bottom: 8px;
+        }
+
+        .slider-linha {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-linha input[type="range"] {
+            flex: 1;
+            accent-color: var(--azul);
+        }
+
+        .slider-linha span {
+            min-width: 42px;
+            font-size: 13px;
+            color: var(--texto-secundario);
+        }
+
+        .botoes-som {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
         /* ========== ESPELHO - ESTILO PRINCIPAL ========== */
         .area-espelho {
             display: flex;
@@ -551,6 +586,29 @@
             </div>
 
             <div class="card">
+                <h2>Brilho e Som</h2>
+                <div class="controle-brilho">
+                    <label>Brilho da tela</label>
+                    <div class="slider-linha">
+                        <input id="slider-brilho" type="range" min="0" max="100" value="40"
+                            oninput="atualizarValorBrilho(this.value)">
+                        <span id="valor-brilho">40%</span>
+                    </div>
+                    <button class="btn-azul" style="width:100%; margin-top:10px;" onclick="aplicarBrilho()">
+                        <span class="material-icons-round">brightness_6</span> Aplicar brilho
+                    </button>
+                </div>
+                <div class="botoes-som">
+                    <button class="btn-controle" onclick="enviarComando('silenciar')">
+                        <span class="material-icons-round">volume_off</span> Silenciar
+                    </button>
+                    <button class="btn-controle" onclick="enviarComando('ativar_som')">
+                        <span class="material-icons-round">volume_up</span> Ativar som
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
                 <h2>Overlay</h2>
                 <div class="overlay-campo">
                     <label>Logo</label>
@@ -690,6 +748,15 @@
             if (!texto) return;
             await enviarComando("texto|" + texto);
             campo.value = "";
+        }
+
+        function atualizarValorBrilho(valor) {
+            document.getElementById("valor-brilho").innerText = `${valor}%`;
+        }
+
+        async function aplicarBrilho() {
+            const valor = document.getElementById("slider-brilho").value;
+            await enviarComando("brilho|" + valor);
         }
 
         let editandoOverlay = false;
