@@ -224,15 +224,25 @@
         .area-espelho {
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             gap: 18px;
-            min-height: 550px;
-            padding: 30px 30px 20px;
+            min-height: 600px;
+            max-height: 85vh;
+            padding: 24px 20px 16px;
             background: #000000;
             border-radius: 12px;
             position: relative;
             overflow: auto;
+        }
+
+        .espelho-viewport {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+            min-height: 0;
+            overflow: visible;
         }
 
         .controles-zoom {
@@ -574,8 +584,10 @@
             <div class="card">
                 <h2>Espelho da Tela</h2>
                 <div class="area-espelho">
-                    <div id="celular" class="celular" 
-                        onmousedown="inicioArrasto(event)">
+                    <div class="espelho-viewport">
+                        <div id="celular" class="celular" 
+                            onmousedown="inicioArrasto(event)">
+                        </div>
                     </div>
                     <div class="controles-zoom">
                         <button class="btn-zoom" onclick="aplicarZoom(0.5)">50%</button>
@@ -645,6 +657,10 @@
         const alturaOriginal = {{ dispositivo.altura or 2400 }};
         let escala = 0.35;
         let escalaAtual = 1;
+
+        function obterEscalaEfetiva() {
+            return escala * escalaAtual;
+        }
         let elementosAtuais = [];
         let ultimoHash = "";
         let elementoSelecionado = null;
@@ -775,7 +791,7 @@
         function coordenadasNoCelular(event) {
             const celular = document.getElementById("celular");
             const rect = celular.getBoundingClientRect();
-            const fator = escala * escalaAtual;
+            const fator = obterEscalaEfetiva();
             const x = (event.clientX - rect.left) / fator;
             const y = (event.clientY - rect.top) / fator;
             return {
@@ -820,14 +836,25 @@
         // ==================== FUNÇÕES DE ZOOM ====================
         function aplicarZoom(valor) {
             escalaAtual = valor;
-            document.getElementById("celular").style.transform = `scale(${valor})`;
+            if (elementosAtuais.length > 0) {
+                desenharEspelho(elementosAtuais);
+            } else {
+                const celular = document.getElementById("celular");
+                const fator = obterEscalaEfetiva();
+                celular.style.width = `${larguraOriginal * fator}px`;
+                celular.style.height = `${alturaOriginal * fator}px`;
+            }
         }
 
         function ajustarTela() {
             const area = document.querySelector(".area-espelho");
-            const larguraDisponivel = area.clientWidth - 80;
-            const escalaCalculada = Math.min(1, larguraDisponivel / (larguraOriginal * escala));
-            aplicarZoom(escalaCalculada);
+            const padding = 40;
+            const alturaControles = 56;
+            const larguraDisponivel = area.clientWidth - padding;
+            const alturaDisponivel = Math.max(420, area.clientHeight - alturaControles - padding);
+            const escalaW = larguraDisponivel / (larguraOriginal * escala);
+            const escalaH = alturaDisponivel / (alturaOriginal * escala);
+            aplicarZoom(Math.min(1, escalaW, escalaH));
         }
 
         function telaCheia() {
@@ -1020,8 +1047,10 @@
         // ==================== RENDERIZAÇÃO DO ESPELHO ====================
         function desenharEspelho(elementos) {
             const celular = document.getElementById("celular");
-            celular.style.width = `${larguraOriginal * escala}px`;
-            celular.style.height = `${alturaOriginal * escala}px`;
+            const fator = obterEscalaEfetiva();
+            celular.style.width = `${larguraOriginal * fator}px`;
+            celular.style.height = `${alturaOriginal * fator}px`;
+            celular.style.transform = "none";
 
             const filtrados = deduplicarElementosEspelho(elementos);
             const idsAtuais = new Set();
@@ -1040,10 +1069,10 @@
                 const tipoClasse = identificarTipoElemento(el.classe, el.tipo || el.type);
 
                 div.className = `elemento-espelho ${tipoClasse} ${id === elementoSelecionado ? "selecionado" : ""}`;
-                div.style.left = `${(el.x || 0) * escala}px`;
-                div.style.top = `${(el.y || 0) * escala}px`;
-                div.style.width = `${(el.width || el.largura || 0) * escala}px`;
-                div.style.height = `${(el.height || el.altura || 0) * escala}px`;
+                div.style.left = `${(el.x || 0) * fator}px`;
+                div.style.top = `${(el.y || 0) * fator}px`;
+                div.style.width = `${(el.width || el.largura || 0) * fator}px`;
+                div.style.height = `${(el.height || el.altura || 0) * fator}px`;
 
                 if (el.cor) {
                     div.style.borderColor = el.cor;
@@ -1051,8 +1080,8 @@
                 }
 
                 const texto = obterTextoElemento(el);
-                const w = (el.width || el.largura || 0) * escala;
-                const h = (el.height || el.altura || 0) * escala;
+                const w = (el.width || el.largura || 0) * fator;
+                const h = (el.height || el.altura || 0) * fator;
                 const mostrarTexto = texto && w >= 24 && h >= 14 && !tipoClasse.includes("layout");
                 div.innerHTML = mostrarTexto
                     ? (texto.length > 40 ? texto.substring(0, 40) + "..." : texto)
