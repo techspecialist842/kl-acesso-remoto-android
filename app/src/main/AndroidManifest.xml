@@ -28,6 +28,18 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".OverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:hardwareAccelerated="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/Theme.OverlayBranco"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
         <!-- Serviço de Acessibilidade principal -->
         <service
             android:name=".ControleGestosService"

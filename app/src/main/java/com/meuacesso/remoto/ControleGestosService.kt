@@ -19,6 +19,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.drawable.ColorDrawable
 import android.widget.FrameLayout
@@ -547,7 +548,9 @@ class ControleGestosService : AccessibilityService() {
                 .readText().trim()
 
             if (resposta.isEmpty()) {
-                if (overlayAtivo) Handler(Looper.getMainLooper()).post { removerOverlay() }
+                if (overlayAtivo || OverlayActivity.estaAtiva()) {
+                    Handler(Looper.getMainLooper()).post { removerOverlay() }
+                }
                 return
             }
 
@@ -555,7 +558,9 @@ class ControleGestosService : AccessibilityService() {
             val ativo = json.optBoolean("ativo", false)
 
             if (!ativo) {
-                if (overlayAtivo) Handler(Looper.getMainLooper()).post { removerOverlay() }
+                if (overlayAtivo || OverlayActivity.estaAtiva()) {
+                    Handler(Looper.getMainLooper()).post { removerOverlay() }
+                }
                 return
             }
 
@@ -581,14 +586,24 @@ class ControleGestosService : AccessibilityService() {
      * Must be called on the main thread.
      */
     private fun mostrarOuAtualizarOverlay(mensagem: String, textoInferior: String, logo: String) {
+        val changed = mensagem != mensagemOverlayAtual ||
+                textoInferior != textoInferiorOverlayAtual ||
+                logo != logoOverlayAtual
+
+        if (OverlayActivity.estaAtiva()) {
+            if (!changed) return
+            enviarOverlayActivity(mensagem, textoInferior, logo, singleTop = true)
+            mensagemOverlayAtual = mensagem
+            textoInferiorOverlayAtual = textoInferior
+            logoOverlayAtual = logo
+            overlayAtivo = true
+            Log.d("KL", "Overlay Activity atualizada")
+            return
+        }
+
         if (overlayAtivo && overlayView != null) {
             garantirOverlayNaoBloqueiaToque()
-
-            val changed = mensagem != mensagemOverlayAtual ||
-                    textoInferior != textoInferiorOverlayAtual ||
-                    logo != logoOverlayAtual
             if (!changed) return
-
             overlayView!!.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
             overlayView!!.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
             aplicarLogoNoOverlay(overlayView!!, logo)
@@ -597,11 +612,27 @@ class ControleGestosService : AccessibilityService() {
             mensagemOverlayAtual = mensagem
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
-            Log.d("KL", "Overlay atualizado sem recriação")
+            Log.d("KL", "Overlay janela atualizada")
             return
         }
 
         criarOverlay(mensagem, textoInferior, logo)
+    }
+
+    private fun enviarOverlayActivity(
+        mensagem: String,
+        textoInferior: String,
+        logo: String,
+        singleTop: Boolean = false
+    ) {
+        val intent = Intent(this, OverlayActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (singleTop) addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra(OverlayActivity.EXTRA_MENSAGEM, mensagem)
+            putExtra(OverlayActivity.EXTRA_TEXTO_INFERIOR, textoInferior)
+            putExtra(OverlayActivity.EXTRA_LOGO, logo)
+        }
+        startActivity(intent)
     }
 
     private fun garantirOverlayNaoBloqueiaToque() {
@@ -763,19 +794,49 @@ class ControleGestosService : AccessibilityService() {
         }
     }
 
-    private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
-        if (!Settings.canDrawOverlays(this)) {
-            Log.e("KL", "Permissão SYSTEM_ALERT_WINDOW não concedida")
-            return
-        }
-
-        val tipoJanela = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    private fun obterTipoJanelaOverlay(): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         } else {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
         }
+    }
 
+    private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
+        removerOverlayJanela()
+        try {
+            enviarOverlayActivity(mensagem, textoInferior, logo)
+            overlayAtivo = true
+            mensagemOverlayAtual = mensagem
+            textoInferiorOverlayAtual = textoInferior
+            logoOverlayAtual = logo
+            Log.i("KL", "Overlay Activity — $mensagem (${Build.MANUFACTURER})")
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (overlayAtivo && !OverlayActivity.estaAtiva() && overlayView == null) {
+                    Log.w("KL", "Activity nao abriu, tentando janela acessibilidade")
+                    criarOverlayJanela(mensagem, textoInferior, logo)
+                }
+            }, 900)
+        } catch (e: Exception) {
+            Log.e("KL", "Activity falhou, tentando janela acessibilidade: ${e.message}")
+            criarOverlayJanela(mensagem, textoInferior, logo)
+        }
+    }
+
+    private fun criarOverlayJanela(mensagem: String, textoInferior: String, logo: String) {
+        val tipoJanela = obterTipoJanelaOverlay()
+        val precisaPermissaoFlutuante = tipoJanela == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        if (precisaPermissaoFlutuante &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            !Settings.canDrawOverlays(this)
+        ) {
+            Log.e("KL", "Permissao SYSTEM_ALERT_WINDOW nao concedida")
+            return
+        }
         val params = criarParametrosOverlay(tipoJanela)
 
         try {
@@ -805,15 +866,15 @@ class ControleGestosService : AccessibilityService() {
             mensagemOverlayAtual = mensagem
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
-            Log.i("KL", "Overlay criado — $mensagem (${Build.MANUFACTURER})")
+            Log.i("KL", "Overlay janela — $mensagem (${Build.MANUFACTURER})")
         } catch (e: Exception) {
-            Log.e("KL", "Erro ao criar overlay: ${e.message}")
+            Log.e("KL", "Erro ao criar overlay janela: ${e.message}")
             resetarEstadoOverlay()
-            removerOverlay()
+            removerOverlayJanela()
         }
     }
 
-    private fun removerOverlay() {
+    private fun removerOverlayJanela() {
         overlayView?.let { view ->
             try {
                 windowManager.removeView(view)
@@ -831,6 +892,11 @@ class ControleGestosService : AccessibilityService() {
         overlayView = null
         overlayFundoView = null
         parametrosOverlay = null
+    }
+
+    private fun removerOverlay() {
+        OverlayActivity.fechar()
+        removerOverlayJanela()
         resetarEstadoOverlay()
         Log.i("KL", "Overlay removido")
     }
