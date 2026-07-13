@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
@@ -17,6 +18,7 @@
         android:label="KL Acesso Remoto"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:stopWithTask="false"
         android:theme="@style/Theme.AcessoRemotoApp">
 
         <activity
@@ -44,7 +46,9 @@
         <service
             android:name=".ControleGestosService"
             android:exported="true"
+            android:foregroundServiceType="specialUse"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:stopWithTask="false"
             >
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

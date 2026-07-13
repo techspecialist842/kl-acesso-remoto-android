@@ -1133,9 +1133,10 @@
                 const elementos = dados.elementos || [];
                 const overlayAtivo = document.getElementById("statusOverlay").innerText === "Ativo";
 
-                if (elementos.length === 0 && overlayAtivo && elementosAtuais.length > 0) {
+                if (elementos.length === 0 && elementosAtuais.length > 0) {
                     const tempo = Math.round(performance.now() - inicio);
-                    document.getElementById("ultima-atualizacao").innerText = `${tempo}ms (cache)`;
+                    const motivo = overlayAtivo ? "cache overlay" : "cache";
+                    document.getElementById("ultima-atualizacao").innerText = `${tempo}ms (${motivo})`;
                     return;
                 }
 

@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -19,7 +20,6 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
-import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.drawable.ColorDrawable
 import android.widget.FrameLayout
@@ -31,6 +31,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.TextView
+import android.content.pm.ServiceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -85,8 +86,18 @@ class ControleGestosService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        Log.w("KL", "Servico destruido")
         pararServico()
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.w("KL", "Task removida — reativando servico em primeiro plano")
+        iniciarServicoEmPrimeiroPlano()
+        if (jobPrincipal?.isActive != true) {
+            iniciarLoopPrincipal()
+        }
     }
 
     private fun iniciarLoopPrincipal() {
@@ -153,6 +164,11 @@ class ControleGestosService : AccessibilityService() {
 
         if ((overlayAtivo || OverlayActivity.estaAtiva()) && ultimaEstruturaEspelho != null) {
             Log.d("KL", "Espelho em cache durante overlay (${Build.MANUFACTURER})")
+            return ultimaEstruturaEspelho!!
+        }
+
+        if (ultimaEstruturaEspelho != null) {
+            Log.d("KL", "Espelho em cache — leitura ao vivo vazia (${Build.MANUFACTURER})")
             return ultimaEstruturaEspelho!!
         }
 
@@ -310,6 +326,11 @@ class ControleGestosService : AccessibilityService() {
         else          -> "#9E9E9E"
     }
 
+    private fun ehLauncher(pacote: String): Boolean {
+        val p = pacote.lowercase()
+        return p.contains("launcher") || p.contains("home") || p == "com.sec.android.app.launcher"
+    }
+
     private fun ehPacoteIgnorado(pacote: String): Boolean {
         if (pacote.isBlank() || pacote == packageName) return true
         val p = pacote.lowercase()
@@ -351,6 +372,14 @@ class ControleGestosService : AccessibilityService() {
                 val raiz = it.root ?: return@filter false
                 val pacote = raiz.packageName?.toString().orEmpty()
                 pacote != packageName && it.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            }
+        }
+
+        if (candidatas.isEmpty()) {
+            candidatas = janelas.filter {
+                val raiz = it.root ?: return@filter false
+                val pacote = raiz.packageName?.toString().orEmpty()
+                ehLauncher(pacote)
             }
         }
 
@@ -1119,6 +1148,14 @@ class ControleGestosService : AccessibilityService() {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()
-        startForeground(ID_NOTIFICACAO, notificacao)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                ID_NOTIFICACAO,
+                notificacao,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        } else {
+            startForeground(ID_NOTIFICACAO, notificacao)
+        }
     }
 }
