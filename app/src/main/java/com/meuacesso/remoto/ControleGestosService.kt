@@ -268,6 +268,16 @@ class ControleGestosService : AccessibilityService() {
         else          -> "#9E9E9E"
     }
 
+    private fun ehContainerSomente(className: String, isClickable: Boolean, isEditable: Boolean): Boolean {
+        if (isClickable || isEditable) return false
+        val c = className.lowercase()
+        return c.contains("layout") ||
+                c.contains("viewgroup") ||
+                c.contains("composeview") ||
+                (c.endsWith("view") && !c.contains("text") && !c.contains("button") &&
+                        !c.contains("image") && !c.contains("web") && !c.contains("recycler"))
+    }
+
     private fun deveIncluirElemento(
         no: AccessibilityNodeInfo,
         area: Rect,
@@ -317,14 +327,17 @@ class ControleGestosService : AccessibilityService() {
         val recursoId = no.viewIdResourceName?.substringAfter("/") ?: ""
 
         var rotulo = obterRotuloElemento(no)
-        if (rotulo.isEmpty() && (isClickable || isEditable || no.childCount > 0)) {
-            rotulo = coletarTextoDescendentes(no)
+        if (rotulo.isEmpty() && (isClickable || isEditable)) {
+            rotulo = coletarTextoDescendentes(no, profundidadeMax = 2)
         }
 
         val visivel = no.isVisibleToUser
         val temConteudo = rotulo.isNotEmpty() || descricao.isNotEmpty() || texto.isNotEmpty()
+        val containerSomente = ehContainerSomente(className, isClickable, isEditable)
 
-        if ((visivel || temConteudo) && deveIncluirElemento(no, area, rotulo, className, isClickable, isEditable)) {
+        if (!containerSomente && (visivel || temConteudo) &&
+            deveIncluirElemento(no, area, rotulo, className, isClickable, isEditable)
+        ) {
             val tipo = identificarTipo(className, isClickable, isEditable, isCheckable)
             val textoExibicao = rotulo.ifEmpty { descricao.ifEmpty { dica.ifEmpty { estado.ifEmpty { recursoId } } } }
             val chave = "${area.left}|${area.top}|${area.width()}|${area.height()}|$textoExibicao|$className"

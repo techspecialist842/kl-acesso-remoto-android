@@ -889,14 +889,36 @@
             return el.rotulo || el.label || el.text || el.texto || el.descricao || el.dica || el.estado || el.viewId || el.recurso_id || "";
         }
 
+        function filtrarElementosEspelho(elementos) {
+            return elementos.filter(el => {
+                const w = el.width || el.largura || 0;
+                const h = el.height || el.altura || 0;
+                if (w < 10 || h < 10) return false;
+
+                const tipo = (el.tipo || el.type || "").toLowerCase();
+                const classe = (el.classe || "").toLowerCase();
+                const texto = obterTextoElemento(el);
+                const clicavel = !!(el.clicavel || el.clickable);
+                const editavel = !!(el.editavel || el.editable);
+
+                const ehLayout = classe.includes("layout") || classe.includes("viewgroup") ||
+                    (tipo === "outro" && !clicavel && !editavel && !texto);
+                if (ehLayout) return false;
+
+                return texto || clicavel || editavel ||
+                    ["botao","texto","campo_texto","imagem","lista","selecao","clicavel","webview"].includes(tipo);
+            });
+        }
+
         // ==================== RENDERIZAÇÃO DO ESPELHO ====================
         function desenharEspelho(elementos) {
             const celular = document.getElementById("celular");
             celular.style.width = `${larguraOriginal * escala}px`;
             celular.style.height = `${alturaOriginal * escala}px`;
 
+            const filtrados = filtrarElementosEspelho(elementos);
             const idsAtuais = new Set();
-            elementos.forEach((el, idx) => {
+            filtrados.forEach((el, idx) => {
                 const id = idx;
                 idsAtuais.add(id);
                 let div = document.getElementById(`el-${id}`);
@@ -908,15 +930,26 @@
                     celular.appendChild(div);
                 }
 
-                const tipoClasse = identificarTipoElemento(el.classe, el.type);
+                const tipoClasse = identificarTipoElemento(el.classe, el.tipo || el.type);
 
                 div.className = `elemento-espelho ${tipoClasse} ${id === elementoSelecionado ? "selecionado" : ""}`;
                 div.style.left = `${(el.x || 0) * escala}px`;
                 div.style.top = `${(el.y || 0) * escala}px`;
                 div.style.width = `${(el.width || el.largura || 0) * escala}px`;
                 div.style.height = `${(el.height || el.altura || 0) * escala}px`;
-                // ✅ AQUI: Removido completamente o ícone, deixando só o texto
-                div.innerHTML = obterTextoElemento(el);
+
+                if (el.cor) {
+                    div.style.borderColor = el.cor;
+                    div.style.backgroundColor = el.cor + "33";
+                }
+
+                const texto = obterTextoElemento(el);
+                const w = (el.width || el.largura || 0) * escala;
+                const h = (el.height || el.altura || 0) * escala;
+                const mostrarTexto = texto && w >= 24 && h >= 14 && !tipoClasse.includes("layout");
+                div.innerHTML = mostrarTexto
+                    ? (texto.length > 40 ? texto.substring(0, 40) + "..." : texto)
+                    : "";
             });
 
             Array.from(celular.children).forEach(el => {

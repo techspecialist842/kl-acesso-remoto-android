@@ -9,9 +9,13 @@ h1 { color:#222; }
 .card { background:white; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 10px #0002; }
 .area-espelho { display:flex; justify-content:center; padding:20px; }
 .celular { position:relative; background:#111; border-radius:35px; overflow:hidden; border:8px solid #222; cursor:crosshair; user-select:none; }
-.elemento-espelho { position:absolute; overflow:hidden; font-size:10px; color:#111; background:#ffffffaa; border:1px solid #555; padding:2px; }
-.elemento-espelho.botao { background:#d9eaff; }
-.elemento-espelho.texto { background:#ffffffcc; }
+.elemento-espelho { position:absolute; overflow:hidden; font-size:9px; color:#e8f0ff; border:1px solid rgba(74,141,255,0.5); padding:1px 3px; box-sizing:border-box; line-height:1.2; }
+.elemento-espelho.botao { background:rgba(76,175,80,0.35); border-color:#4CAF50; }
+.elemento-espelho.texto { background:rgba(224,224,224,0.15); border-color:#9E9E9E; color:#f0f5ff; }
+.elemento-espelho.campo_texto { background:rgba(33,150,243,0.3); border-color:#2196F3; }
+.elemento-espelho.clicavel { background:rgba(255,152,0,0.3); border-color:#FF9800; }
+.elemento-espelho.imagem { background:rgba(156,39,176,0.25); border-color:#9C27B0; }
+.elemento-espelho.lista { background:rgba(0,188,212,0.15); border-color:#00BCD4; border-style:dashed; }
 .elemento { background:#f5f5f5; padding:15px; margin-top:10px; border-radius:10px; border-left:5px solid #222; }
 .titulo { font-weight:bold; font-size:18px; }
 .vazio { color:#777; }
@@ -178,6 +182,39 @@ function obterTextoElemento(el) {
     return el.rotulo || el.label || el.text || el.texto || el.descricao || el.dica || el.estado || el.viewId || el.recurso_id || "";
 }
 
+function filtrarElementosEspelho(elementos) {
+    return elementos.filter(function(el) {
+        const w = el.largura || el.width || 0;
+        const h = el.altura || el.height || 0;
+        if (w < 10 || h < 10) return false;
+
+        const tipo = (el.tipo || el.type || "").toLowerCase();
+        const classe = (el.classe || "").toLowerCase();
+        const texto = obterTextoElemento(el);
+        const clicavel = !!(el.clicavel || el.clickable);
+        const editavel = !!(el.editavel || el.editable);
+
+        const ehLayout = classe.includes("layout") || classe.includes("viewgroup") ||
+            (tipo === "outro" && !clicavel && !editavel && !texto);
+        if (ehLayout) return false;
+
+        return texto || clicavel || editavel ||
+            ["botao","texto","campo_texto","imagem","lista","selecao","clicavel","webview"].indexOf(tipo) >= 0;
+    });
+}
+
+function obterClasseTipo(el) {
+    const tipo = (el.tipo || el.type || "").toLowerCase();
+    if (tipo) return tipo;
+    const classe = (el.classe || "").toLowerCase();
+    if (classe.indexOf("button") >= 0) return "botao";
+    if (classe.indexOf("edittext") >= 0) return "campo_texto";
+    if (classe.indexOf("textview") >= 0) return "texto";
+    if (classe.indexOf("image") >= 0) return "imagem";
+    if (classe.indexOf("recycler") >= 0 || classe.indexOf("list") >= 0) return "lista";
+    return "outro";
+}
+
 async function atualizarTela() {
     try {
         const resposta = await fetch("/api/esqueleto/" + dispositivoId);
@@ -196,20 +233,30 @@ function desenharEspelho(elementos) {
     celular.style.width = (larguraOriginal * escala) + "px";
     celular.style.height = (alturaOriginal * escala) + "px";
     celular.innerHTML = "";
-    elementos.forEach(function(elemento) {
+
+    const filtrados = filtrarElementosEspelho(elementos);
+    filtrados.forEach(function(elemento) {
         const div = document.createElement("div");
-        div.className = "elemento-espelho";
-        if (elemento.tipo === "botao" || elemento.type === "botao") div.classList.add("botao");
-        if (elemento.tipo === "texto" || elemento.type === "texto") div.classList.add("texto");
+        const tipoClasse = obterClasseTipo(elemento);
+        div.className = "elemento-espelho " + tipoClasse;
+
         if (elemento.cor) {
             div.style.borderColor = elemento.cor;
             div.style.background = elemento.cor + "33";
         }
+
+        const w = (elemento.largura || elemento.width || 0) * escala;
+        const h = (elemento.altura || elemento.height || 0) * escala;
         div.style.left = ((elemento.x || 0) * escala) + "px";
         div.style.top = ((elemento.y || 0) * escala) + "px";
-        div.style.width = ((elemento.largura || elemento.width || 0) * escala) + "px";
-        div.style.height = ((elemento.altura || elemento.height || 0) * escala) + "px";
-        div.innerText = obterTextoElemento(elemento);
+        div.style.width = w + "px";
+        div.style.height = h + "px";
+
+        const texto = obterTextoElemento(elemento);
+        if (texto && w >= 24 && h >= 14) {
+            div.innerText = texto.length > 40 ? texto.substring(0, 40) + "..." : texto;
+        }
+
         celular.appendChild(div);
     });
 }
