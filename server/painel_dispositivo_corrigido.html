@@ -885,6 +885,10 @@
             `;
         }
 
+        function obterTextoElemento(el) {
+            return el.rotulo || el.label || el.text || el.texto || el.descricao || el.dica || el.estado || el.viewId || el.recurso_id || "";
+        }
+
         // ==================== RENDERIZAÇÃO DO ESPELHO ====================
         function desenharEspelho(elementos) {
             const celular = document.getElementById("celular");
@@ -912,7 +916,7 @@
                 div.style.width = `${(el.width || el.largura || 0) * escala}px`;
                 div.style.height = `${(el.height || el.altura || 0) * escala}px`;
                 // ✅ AQUI: Removido completamente o ícone, deixando só o texto
-                div.innerHTML = el.text || el.texto || "";
+                div.innerHTML = obterTextoElemento(el);
             });
 
             Array.from(celular.children).forEach(el => {
@@ -928,7 +932,7 @@
 
             if (termoBusca) {
                 listaFiltrada = elementos.filter(el => 
-                    (el.text || el.texto || "").toLowerCase().includes(termoBusca) ||
+                    obterTextoElemento(el).toLowerCase().includes(termoBusca) ||
                     (el.classe || "").toLowerCase().includes(termoBusca) ||
                     (el.type || "").toLowerCase().includes(termoBusca) ||
                     (el.resourceId || el.viewId || "").toLowerCase().includes(termoBusca)

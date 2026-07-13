@@ -4,5 +4,6 @@
     android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews|flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRequestEnhancedWebAccessibility="true"
     android:canPerformGestures="true"
     android:canRetrieveWindowContent="true" />

