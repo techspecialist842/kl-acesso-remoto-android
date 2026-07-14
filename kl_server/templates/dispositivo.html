@@ -803,6 +803,9 @@
                     })
                 });
                 document.getElementById("statusOverlay").innerText = overlayAtivo ? "Ativo" : "Texto salvo";
+                if (overlayAtivo) {
+                    await enviarComando("overlay_ligar");
+                }
             } catch (e) {
                 console.log("Erro atualizar texto:", e);
             }
@@ -819,6 +822,7 @@
                     texto_inferior: document.getElementById("textoInferiorOverlay").value
                 })
             });
+            await enviarComando("overlay_ligar");
             document.getElementById("statusOverlay").innerText = "Ativo";
         }
 
@@ -828,6 +832,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ dispositivo: dispositivoId })
             });
+            await enviarComando("overlay_desligar");
             document.getElementById("statusOverlay").innerText = "Desativado";
         }
 
