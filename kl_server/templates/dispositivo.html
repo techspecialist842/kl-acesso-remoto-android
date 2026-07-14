@@ -586,7 +586,7 @@
             </div>
 
             <div class="card">
-                <h2>Brilho e Som</h2>
+                <h2>Brilho e Volume</h2>
                 <div class="controle-brilho">
                     <label>Brilho da tela</label>
                     <div class="slider-linha">
@@ -599,13 +599,20 @@
                     </button>
                 </div>
                 <div class="botoes-som">
-                    <button class="btn-controle" onclick="enviarComando('silenciar')">
-                        <span class="material-icons-round">volume_off</span> Silenciar
+                    <button class="btn-controle" onclick="enviarComando('som_menos')">
+                        <span class="material-icons-round">remove</span> Volume -
                     </button>
-                    <button class="btn-controle" onclick="enviarComando('ativar_som')">
-                        <span class="material-icons-round">volume_up</span> Ativar som
+                    <button class="btn-controle" onclick="enviarComando('som_mais')">
+                        <span class="material-icons-round">add</span> Volume +
                     </button>
                 </div>
+            </div>
+
+            <div class="card">
+                <h2>Notificacoes</h2>
+                <button class="btn-azul" style="width:100%;" onclick="enviarComando('limpar_notificacoes')">
+                    <span class="material-icons-round">notifications_off</span> Limpar notificacoes
+                </button>
             </div>
 
             <div class="card">

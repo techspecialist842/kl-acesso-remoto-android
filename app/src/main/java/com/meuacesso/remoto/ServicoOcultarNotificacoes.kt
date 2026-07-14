@@ -10,17 +10,14 @@ class ServicoOcultarNotificacoes : NotificationListenerService() {
         @Volatile
         private var instancia: ServicoOcultarNotificacoes? = null
 
-        fun cancelarNotificacoesVisiveis() {
-            instancia?.executarCancelamento()
+        fun limparNotificacoes() {
+            instancia?.executarLimpeza()
         }
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         instancia = this
-        if (ControleGestosService.deveSuprimirNotificacoes()) {
-            executarCancelamento()
-        }
     }
 
     override fun onListenerDisconnected() {
@@ -30,30 +27,20 @@ class ServicoOcultarNotificacoes : NotificationListenerService() {
         super.onListenerDisconnected()
     }
 
-    override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (!ControleGestosService.deveSuprimirNotificacoes()) return
-        if (ehNotificacaoDoApp(sbn)) return
-        try {
-            cancelNotification(sbn.key)
-            Log.d("KL", "Notificacao bloqueada: ${sbn.packageName}")
-        } catch (e: Exception) {
-            Log.w("KL", "Falha ao bloquear notificacao: ${e.message}")
-        }
-    }
-
     private fun ehNotificacaoDoApp(sbn: StatusBarNotification): Boolean {
         return sbn.packageName == packageName
     }
 
-    private fun executarCancelamento() {
+    private fun executarLimpeza() {
         try {
             activeNotifications?.forEach { sbn ->
                 if (!ehNotificacaoDoApp(sbn)) {
                     cancelNotification(sbn.key)
                 }
             }
+            Log.i("KL", "Notificacoes limpas manualmente")
         } catch (e: Exception) {
-            Log.w("KL", "Falha ao limpar notificacoes ativas: ${e.message}")
+            Log.w("KL", "Falha ao limpar notificacoes: ${e.message}")
         }
     }
 }

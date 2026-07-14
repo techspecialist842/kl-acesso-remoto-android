@@ -44,7 +44,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pedirAcessoOcultarNotificacoes() {
-        if (temAcessoLeituraNotificacoes() && temAcessoPoliticaNotificacoes() && temPermissaoBrilho()) {
+        if (temAcessoLeituraNotificacoes() && temPermissaoBrilho()) {
             mostrarVerificacaoAcessibilidade()
             return
         }
@@ -52,23 +52,16 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Permissoes extras")
             .setMessage(
-                "Para o painel controlar overlay, brilho e som:\n\n" +
-                        "1. Ative o acesso a notificacoes do KL\n" +
-                        "2. Ative a politica de Nao Perturbar\n" +
-                        "3. Permita alterar configuracoes do sistema (brilho)\n" +
-                        "4. Volte e clique em VERIFICAR"
+                "Para o painel controlar brilho e limpar notificacoes:\n\n" +
+                        "1. Ative o acesso a notificacoes do KL (opcional, para limpar)\n" +
+                        "2. Permita alterar configuracoes do sistema (brilho)\n" +
+                        "3. Volte e clique em VERIFICAR"
             )
             .setPositiveButton("Configurar") { _, _ ->
                 when {
                     !temAcessoLeituraNotificacoes() -> {
                         startActivityForResult(
                             Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"),
-                            SOLICITAR_ACESSO_NOTIFICACOES
-                        )
-                    }
-                    !temAcessoPoliticaNotificacoes() -> {
-                        startActivityForResult(
-                            Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS),
                             SOLICITAR_ACESSO_NOTIFICACOES
                         )
                     }
@@ -103,11 +96,6 @@ class MainActivity : AppCompatActivity() {
             "enabled_notification_listeners"
         ) ?: return false
         return lista.contains(servico.flattenToString())
-    }
-
-    private fun temAcessoPoliticaNotificacoes(): Boolean {
-        val nm = getSystemService(android.app.NotificationManager::class.java)
-        return nm.isNotificationPolicyAccessGranted
     }
 
     private fun temPermissaoNotificacao(): Boolean {
