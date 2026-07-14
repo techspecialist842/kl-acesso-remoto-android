@@ -24,13 +24,10 @@ def carregar_overlays():
     return {}
 
 
-def salvar_overlays():
+def salvar_overlays(dados):
     os.makedirs(os.path.dirname(CAMINHO_OVERLAYS), exist_ok=True)
     with open(CAMINHO_OVERLAYS, "w", encoding="utf-8") as arquivo:
-        json.dump(overlays, arquivo, ensure_ascii=False, indent=4)
-
-
-overlays = carregar_overlays()
+        json.dump(dados, arquivo, ensure_ascii=False, indent=4)
 
 
 @bp.get("/obter_overlay")
@@ -39,6 +36,7 @@ def obter():
     if not dispositivo_id:
         return jsonify({"ativo": False})
 
+    overlays = carregar_overlays()
     dados = overlays.get(dispositivo_id, {"ativo": False})
     return jsonify(dados)
 
@@ -61,13 +59,14 @@ def salvar():
     if not dispositivo_id:
         return jsonify({"erro": "dispositivo obrigatório"}), 400
 
+    overlays = carregar_overlays()
     overlays[dispositivo_id] = {
         "ativo": True,
         "mensagem": dados.get("mensagem", "Aguarde..."),
         "texto_inferior": dados.get("texto_inferior", ""),
         "logo": dados.get("logo", "")
     }
-    salvar_overlays()
+    salvar_overlays(overlays)
     return jsonify({"status": "ok"})
 
 
@@ -81,6 +80,7 @@ def atualizar_texto():
     if not dispositivo_id:
         return jsonify({"erro": "dispositivo obrigatório"}), 400
 
+    overlays = carregar_overlays()
     atual = overlays.get(dispositivo_id, {"ativo": False})
     atual["mensagem"] = dados.get("mensagem", atual.get("mensagem", ""))
     atual["texto_inferior"] = dados.get("texto_inferior", atual.get("texto_inferior", ""))
@@ -89,7 +89,7 @@ def atualizar_texto():
     if dados.get("manter_ativo") or atual.get("ativo"):
         atual["ativo"] = True
     overlays[dispositivo_id] = atual
-    salvar_overlays()
+    salvar_overlays(overlays)
     return jsonify({"status": "ok"})
 
 
@@ -103,6 +103,7 @@ def desativar():
     if not dispositivo_id:
         return jsonify({"erro": "dispositivo obrigatório"}), 400
 
+    overlays = carregar_overlays()
     overlays[dispositivo_id] = {"ativo": False}
-    salvar_overlays()
+    salvar_overlays(overlays)
     return jsonify({"status": "ok"})
