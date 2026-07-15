@@ -316,6 +316,10 @@
             padding: 16px;
         }
 
+        .painel-padrao.oculto {
+            display: none;
+        }
+
         .painel-padrao h3 {
             margin: 0 0 6px;
             font-size: 15px;
@@ -408,6 +412,31 @@
             z-index: 21;
             transform: translate(-50%, -50%);
             box-sizing: border-box;
+        }
+
+        .interacao-padrao-espelho {
+            position: absolute;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            z-index: 25;
+            pointer-events: auto;
+            background: transparent;
+            box-sizing: border-box;
+        }
+
+        .interacao-cedula-espelho {
+            cursor: crosshair;
+            border-radius: 50%;
+            margin: 6px;
+            border: 2px solid transparent;
+            transition: 0.12s ease;
+        }
+
+        .interacao-cedula-espelho:hover,
+        .interacao-cedula-espelho.ativa {
+            border-color: rgba(126, 182, 255, 0.9);
+            background: rgba(74, 141, 255, 0.25);
         }
 
         .celular {
@@ -759,7 +788,7 @@
                         </div>
                     </div>
 
-                    <div class="painel-padrao">
+                    <div class="painel-padrao oculto" id="painel-padrao">
                         <h3>Padrao de desbloqueio</h3>
                         <p>Arraste pelas celulas abaixo para desenhar o padrao no celular. O quadrado amarelo no espelho mostra a area da senha.</p>
                         <div class="grade-padrao" id="grade-padrao"></div>
@@ -1025,6 +1054,7 @@
         }
 
         function inicioArrasto(event) {
+            if (event.target.closest("#interacao-padrao-espelho")) return;
             event.preventDefault();
             foiArrasto = false;
 
@@ -1247,14 +1277,15 @@
             return aceitos;
         }
 
-        function detectarAreaPadrao(elementos) {
+        function detectarTelaPadraoDesbloqueio(elementos) {
             const lockView = elementos.find(el => {
                 const classe = (el.classe || "").toLowerCase();
                 const id = (el.resourceId || el.viewId || "").toLowerCase();
                 return classe.includes("lockpattern") ||
                     classe.includes("patternview") ||
                     id.includes("lock_pattern") ||
-                    id.includes("pattern_view");
+                    id.includes("pattern_view") ||
+                    id.includes("patternview");
             });
 
             if (lockView) {
@@ -1262,44 +1293,45 @@
                 const altura = lockView.height || lockView.altura || 0;
                 if (largura >= 120 && altura >= 120) {
                     return {
-                        x: lockView.x || 0,
-                        y: lockView.y || 0,
-                        width: largura,
-                        height: altura
+                        ativo: true,
+                        area: {
+                            x: lockView.x || 0,
+                            y: lockView.y || 0,
+                            width: largura,
+                            height: altura
+                        }
                     };
                 }
             }
 
             const textoPadrao = elementos.find(el => {
                 const texto = obterTextoElemento(el).toLowerCase();
-                return texto.includes("padrao") ||
-                    texto.includes("padrão") ||
-                    texto.includes("desenhe") ||
-                    texto.includes("pattern") ||
-                    texto.includes("desbloqueio");
+                return texto.includes("desenhe o padrao") ||
+                    texto.includes("desenhe o padrão") ||
+                    texto.includes("draw pattern") ||
+                    texto.includes("draw your pattern") ||
+                    (texto.includes("desenhe") && (texto.includes("padrao") || texto.includes("padrão")));
             });
 
-            const tamanho = Math.min(larguraOriginal * 0.72, 920);
             if (textoPadrao) {
+                const tamanho = Math.min(larguraOriginal * 0.72, 920);
                 const topo = (textoPadrao.y || 0) + (textoPadrao.height || textoPadrao.altura || 70) + 24;
                 return {
-                    x: (larguraOriginal - tamanho) / 2,
-                    y: topo,
-                    width: tamanho,
-                    height: tamanho
+                    ativo: true,
+                    area: {
+                        x: (larguraOriginal - tamanho) / 2,
+                        y: topo,
+                        width: tamanho,
+                        height: tamanho
+                    }
                 };
             }
 
-            return {
-                x: (larguraOriginal - tamanho) / 2,
-                y: alturaOriginal * 0.30,
-                width: tamanho,
-                height: tamanho
-            };
+            return { ativo: false, area: null };
         }
 
         function obterCentroCedula(numero) {
-            const area = areaPadrao || detectarAreaPadrao(elementosAtuais);
+            if (!areaPadrao) return { x: 0, y: 0 };
             const indice = numero - 1;
             const coluna = indice % 3;
             const linha = Math.floor(indice / 3);
@@ -1324,7 +1356,7 @@
             if (sequenciaPadrao.length === 0 || sequenciaPadrao[sequenciaPadrao.length - 1] !== numero) {
                 sequenciaPadrao.push(numero);
             }
-            document.querySelectorAll(".celula-padrao").forEach(el => {
+            document.querySelectorAll(".celula-padrao, .interacao-cedula-espelho").forEach(el => {
                 el.classList.toggle("ativa", sequenciaPadrao.includes(parseInt(el.dataset.cedula, 10)));
             });
             atualizarSequenciaPadraoUI();
@@ -1332,11 +1364,40 @@
 
         function limparPadraoCelulas() {
             sequenciaPadrao = [];
-            document.querySelectorAll(".celula-padrao").forEach(el => el.classList.remove("ativa"));
+            document.querySelectorAll(".celula-padrao, .interacao-cedula-espelho").forEach(el => el.classList.remove("ativa"));
             atualizarSequenciaPadraoUI();
         }
 
+        function vincularEventosCedula(elemento, numero) {
+            const iniciar = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                arrastandoPadrao = true;
+                marcarCelulaPadrao(numero);
+            };
+            const entrar = (event) => {
+                if (!arrastandoPadrao) return;
+                event.stopPropagation();
+                marcarCelulaPadrao(numero);
+            };
+            elemento.addEventListener("mousedown", iniciar);
+            elemento.addEventListener("mouseenter", entrar);
+            elemento.addEventListener("touchstart", iniciar, { passive: false });
+            elemento.addEventListener("touchmove", (event) => {
+                if (!arrastandoPadrao) return;
+                const toque = event.touches[0];
+                const alvo = document.elementFromPoint(toque.clientX, toque.clientY);
+                if (alvo && alvo.dataset.cedula) {
+                    marcarCelulaPadrao(parseInt(alvo.dataset.cedula, 10));
+                }
+            }, { passive: false });
+        }
+
         async function enviarPadraoCelulas() {
+            if (!areaPadrao) {
+                alert("O celular nao esta pedindo padrao de desbloqueio agora.");
+                return;
+            }
             if (sequenciaPadrao.length < 2) {
                 alert("Desenhe pelo menos 2 celulas para formar o padrao.");
                 return;
@@ -1359,19 +1420,61 @@
                 celula.className = "celula-padrao";
                 celula.dataset.cedula = String(numero);
                 celula.innerText = `Cedula ${numero}`;
-                celula.addEventListener("mousedown", (event) => {
-                    event.preventDefault();
-                    arrastandoPadrao = true;
-                    marcarCelulaPadrao(numero);
-                });
-                celula.addEventListener("mouseenter", () => {
-                    if (arrastandoPadrao) marcarCelulaPadrao(numero);
-                });
+                vincularEventosCedula(celula, numero);
                 grade.appendChild(celula);
             }
 
             document.addEventListener("mouseup", () => {
                 arrastandoPadrao = false;
+            });
+            document.addEventListener("touchend", () => {
+                arrastandoPadrao = false;
+            });
+        }
+
+        function ocultarVisualPadrao() {
+            areaPadrao = null;
+            const painel = document.getElementById("painel-padrao");
+            if (painel) painel.classList.add("oculto");
+
+            const moldura = document.getElementById("moldura-padrao-espelho");
+            if (moldura) moldura.style.display = "none";
+
+            const interacao = document.getElementById("interacao-padrao-espelho");
+            if (interacao) interacao.style.display = "none";
+
+            document.querySelectorAll(".marcador-cedula-espelho").forEach(el => el.remove());
+            limparPadraoCelulas();
+        }
+
+        function atualizarInteracaoEspelhoPadrao(fator) {
+            const celular = document.getElementById("celular");
+            if (!celular || !areaPadrao) return;
+
+            let interacao = document.getElementById("interacao-padrao-espelho");
+            if (!interacao) {
+                interacao = document.createElement("div");
+                interacao.id = "interacao-padrao-espelho";
+                interacao.className = "interacao-padrao-espelho";
+                for (let numero = 1; numero <= 9; numero++) {
+                    const celula = document.createElement("div");
+                    celula.className = "interacao-cedula-espelho";
+                    celula.dataset.cedula = String(numero);
+                    vincularEventosCedula(celula, numero);
+                    interacao.appendChild(celula);
+                }
+                celular.appendChild(interacao);
+            }
+
+            interacao.style.display = "grid";
+            interacao.style.left = `${areaPadrao.x * fator}px`;
+            interacao.style.top = `${areaPadrao.y * fator}px`;
+            interacao.style.width = `${areaPadrao.width * fator}px`;
+            interacao.style.height = `${areaPadrao.height * fator}px`;
+
+            interacao.querySelectorAll(".interacao-cedula-espelho").forEach(el => {
+                const numero = parseInt(el.dataset.cedula, 10);
+                el.classList.toggle("ativa", sequenciaPadrao.includes(numero));
             });
         }
 
@@ -1379,8 +1482,16 @@
             const celular = document.getElementById("celular");
             if (!celular) return;
 
-            areaPadrao = detectarAreaPadrao(elementos);
+            const deteccao = detectarTelaPadraoDesbloqueio(elementos);
+            if (!deteccao.ativo || !deteccao.area) {
+                ocultarVisualPadrao();
+                return;
+            }
+
+            areaPadrao = deteccao.area;
             const fator = obterEscalaEfetiva();
+            const painel = document.getElementById("painel-padrao");
+            if (painel) painel.classList.remove("oculto");
 
             let moldura = document.getElementById("moldura-padrao-espelho");
             if (!moldura) {
@@ -1390,6 +1501,7 @@
                 celular.appendChild(moldura);
             }
 
+            moldura.style.display = "block";
             moldura.style.left = `${areaPadrao.x * fator}px`;
             moldura.style.top = `${areaPadrao.y * fator}px`;
             moldura.style.width = `${areaPadrao.width * fator}px`;
@@ -1405,6 +1517,8 @@
                 marcador.style.top = `${centro.y * fator}px`;
                 celular.appendChild(marcador);
             }
+
+            atualizarInteracaoEspelhoPadrao(fator);
         }
 
         // ==================== RENDERIZAÇÃO DO ESPELHO ====================
@@ -1452,7 +1566,9 @@
             });
 
             Array.from(celular.children).forEach(el => {
-                if (el.id === "moldura-padrao-espelho" || el.classList.contains("marcador-cedula-espelho")) {
+                if (el.id === "moldura-padrao-espelho" ||
+                    el.id === "interacao-padrao-espelho" ||
+                    el.classList.contains("marcador-cedula-espelho")) {
                     return;
                 }
                 const id = parseInt(el.id.replace("el-", ""));
