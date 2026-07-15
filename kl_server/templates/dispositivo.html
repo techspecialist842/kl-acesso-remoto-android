@@ -1424,11 +1424,7 @@
 
             try {
                 await enviarComando("padrao_nums|" + coordenadas);
-                if (fabricanteUsaToquesPadrao()) {
-                    mostrarStatusPadrao("Padrao enviado (celulas no aparelho). Verifique o celular.", "ok");
-                } else {
-                    mostrarStatusPadrao("Padrao enviado! Verifique o celular.", "ok");
-                }
+                mostrarStatusPadrao("Padrao enviado (gesto continuo no aparelho). Verifique o celular.", "ok");
             } catch (e) {
                 mostrarStatusPadrao("Erro ao enviar. Atualize painel e APK no celular.", "erro");
             }
