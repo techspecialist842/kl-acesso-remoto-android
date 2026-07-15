@@ -137,13 +137,16 @@
         </div>
         <div class="instrucoes-setup">
             <strong>Configuracao necessaria no VPS (uma vez):</strong>
-            Execute no servidor como root:
+            Se <code>/root/kl_server</code> nao tem git, use estes comandos:
             <code>cd /root/kl_server
-git pull origin main
+mkdir -p scripts
+wget -O scripts/atualizar_arquivos_vps.sh https://raw.githubusercontent.com/techspecialist842/kl-acesso-remoto-android/main/kl_server/scripts/atualizar_arquivos_vps.sh
+bash scripts/atualizar_arquivos_vps.sh
 bash scripts/setup_apk_builder.sh
-pkill -f gunicorn
+pkill -f gunicorn || true
 source venv/bin/activate
 gunicorn -c gunicorn.conf.py app:app</code>
+            O arquivo <strong>gunicorn.conf.py</strong> fica em <code>/root/kl_server/gunicorn.conf.py</code> (mesma pasta do app.py).
         </div>
         {% endif %}
 

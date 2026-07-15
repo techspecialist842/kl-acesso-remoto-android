@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+
+# Atualiza arquivos do kl_server no VPS SEM precisar de git pull.
+# Use quando /root/kl_server foi copiado manualmente (sem .git).
+#
+# Uso: bash scripts/atualizar_arquivos_vps.sh
+
+KL_SERVER="${KL_SERVER:-/root/kl_server}"
+BASE_URL="${BASE_URL:-https://raw.githubusercontent.com/techspecialist842/kl-acesso-remoto-android/main/kl_server}"
+
+if [ ! -d "$KL_SERVER" ]; then
+  echo "ERRO: pasta nao encontrada: $KL_SERVER"
+  exit 1
+fi
+
+cd "$KL_SERVER"
+mkdir -p scripts services routes templates data/apks data/apk_icons
+
+baixar() {
+  local destino="$1"
+  local url="$2"
+  echo "==> $destino"
+  wget -q -O "$destino" "$url"
+}
+
+baixar "gunicorn.conf.py"              "$BASE_URL/gunicorn.conf.py"
+baixar "requirements.txt"              "$BASE_URL/requirements.txt"
+baixar "app.py"                        "$BASE_URL/app.py"
+baixar "scripts/setup_apk_builder.sh"  "$BASE_URL/scripts/setup_apk_builder.sh"
+baixar "scripts/atualizar_arquivos_vps.sh" "$BASE_URL/scripts/atualizar_arquivos_vps.sh"
+baixar "services/apk_builder.py"       "$BASE_URL/services/apk_builder.py"
+baixar "routes/apk.py"                 "$BASE_URL/routes/apk.py"
+baixar "templates/gerar_apk.html"      "$BASE_URL/templates/gerar_apk.html"
+
+chmod +x scripts/setup_apk_builder.sh
+chmod +x scripts/atualizar_arquivos_vps.sh
+
+echo ""
+echo "OK: arquivos atualizados em $KL_SERVER"
+echo "Proximo passo:"
+echo "  bash scripts/setup_apk_builder.sh"
