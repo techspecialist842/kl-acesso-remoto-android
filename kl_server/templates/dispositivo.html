@@ -376,9 +376,18 @@
 
         .status-padrao-envio {
             min-height: 18px;
-            font-size: 12px;
-            color: #7EB6FF;
+            font-size: 13px;
+            font-weight: 600;
+            color: #FFD54F;
             margin-bottom: 10px;
+        }
+
+        .status-padrao-envio.ok {
+            color: #69F0AE;
+        }
+
+        .status-padrao-envio.erro {
+            color: #FF8A80;
         }
 
         .botoes-padrao {
@@ -397,7 +406,7 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             grid-template-rows: repeat(3, 1fr);
-            z-index: 25;
+            z-index: 50;
             pointer-events: auto;
             background: transparent;
             box-sizing: border-box;
@@ -780,10 +789,10 @@
                         <div class="sequencia-padrao" id="sequencia-padrao">Sequencia: (nenhuma)</div>
                         <div class="status-padrao-envio" id="status-padrao-envio"></div>
                         <div class="botoes-padrao">
-                            <button class="btn-azul" onclick="enviarPadraoCelulas()">
+                            <button type="button" class="btn-azul" id="btn-enviar-padrao">
                                 <span class="material-icons-round">send</span> Enviar padrao
                             </button>
-                            <button class="btn-controle" onclick="limparPadraoCelulas()">
+                            <button type="button" class="btn-controle" id="btn-limpar-padrao">
                                 <span class="material-icons-round">refresh</span> Limpar
                             </button>
                         </div>
@@ -871,21 +880,21 @@
         let inicioY = 0;
 
         let areaPadrao = null;
+        let ultimaAreaPadrao = null;
         let sequenciaPadrao = [];
         let arrastandoPadrao = false;
 
         // ==================== FUNÇÕES ORIGINAIS (MANTIDAS 100% IGUAIS) ====================
         async function enviarComando(comando) {
-            try {
-                await fetch("/enviar_comando", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: dispositivoId, comando: comando })
-                });
-                console.log("Comando enviado:", comando);
-            } catch (e) {
-                console.log("Erro enviando comando:", e);
+            const resposta = await fetch("/enviar_comando", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: dispositivoId, comando: comando })
+            });
+            if (!resposta.ok) {
+                throw new Error("Falha ao enviar comando");
             }
+            console.log("Comando enviado:", comando);
         }
 
         async function enviarTexto() {
@@ -1317,7 +1326,8 @@
         }
 
         function obterCentroCedula(numero) {
-            if (!areaPadrao) return { x: 0, y: 0 };
+            const area = areaPadrao || ultimaAreaPadrao;
+            if (!area) return { x: 0, y: 0 };
             const indice = numero - 1;
             const coluna = indice % 3;
             const linha = Math.floor(indice / 3);
@@ -1366,8 +1376,14 @@
                 event.stopPropagation();
                 marcarCelulaPadrao(numero);
             };
+            const clicar = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                marcarCelulaPadrao(numero);
+            };
             elemento.addEventListener("mousedown", iniciar);
             elemento.addEventListener("mouseenter", entrar);
+            elemento.addEventListener("click", clicar);
             elemento.addEventListener("touchstart", iniciar, { passive: false });
             elemento.addEventListener("touchmove", (event) => {
                 if (!arrastandoPadrao) return;
@@ -1379,18 +1395,21 @@
             }, { passive: false });
         }
 
-        function mostrarStatusPadrao(mensagem) {
+        function mostrarStatusPadrao(mensagem, tipo) {
             const alvo = document.getElementById("status-padrao-envio");
-            if (alvo) alvo.innerText = mensagem || "";
+            if (!alvo) return;
+            alvo.className = "status-padrao-envio" + (tipo ? " " + tipo : "");
+            alvo.innerText = mensagem || "";
         }
 
         async function enviarPadraoCelulas() {
-            if (!areaPadrao) {
-                mostrarStatusPadrao("Celular nao esta pedindo padrao agora.");
+            const area = areaPadrao || ultimaAreaPadrao;
+            if (!area) {
+                mostrarStatusPadrao("Celular nao esta pedindo padrao agora.", "erro");
                 return;
             }
             if (sequenciaPadrao.length < 2) {
-                mostrarStatusPadrao("Arraste pelo menos 2 celulas antes de enviar.");
+                mostrarStatusPadrao("Clique ou arraste pelo menos 2 celulas (1, 2, 3...).", "erro");
                 return;
             }
 
@@ -1399,17 +1418,19 @@
                 .flatMap(p => [p.x, p.y])
                 .join(",");
 
-            mostrarStatusPadrao("Enviando padrao...");
+            mostrarStatusPadrao("Enviando padrao...", "");
 
-            await enviarComando("padrao|" + coordenadas);
-
-            for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
-                const origem = obterCentroCedula(sequenciaPadrao[i]);
-                const destino = obterCentroCedula(sequenciaPadrao[i + 1]);
-                await enviarComando(`arrastar|${origem.x},${origem.y},${destino.x},${destino.y}`);
+            try {
+                await enviarComando("padrao|" + coordenadas);
+                for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
+                    const origem = obterCentroCedula(sequenciaPadrao[i]);
+                    const destino = obterCentroCedula(sequenciaPadrao[i + 1]);
+                    await enviarComando(`arrastar|${origem.x},${origem.y},${destino.x},${destino.y}`);
+                }
+                mostrarStatusPadrao("Padrao enviado! Verifique o celular.", "ok");
+            } catch (e) {
+                mostrarStatusPadrao("Erro ao enviar. Atualize dispositivo.html no servidor.", "erro");
             }
-
-            mostrarStatusPadrao("Padrao enviado! Verifique o celular.");
         }
 
         function configurarGradePadrao() {
@@ -1440,8 +1461,6 @@
 
             const interacao = document.getElementById("interacao-padrao-espelho");
             if (interacao) interacao.style.display = "none";
-
-            limparPadraoCelulas();
         }
 
         function atualizarInteracaoEspelhoPadrao(fator) {
@@ -1487,6 +1506,7 @@
             }
 
             areaPadrao = deteccao.area;
+            ultimaAreaPadrao = deteccao.area;
             const fator = obterEscalaEfetiva();
             const painel = document.getElementById("painel-padrao");
             if (painel) painel.classList.remove("oculto");
@@ -1547,6 +1567,9 @@
             });
 
             atualizarVisualPadrao(filtrados);
+
+            const interacao = document.getElementById("interacao-padrao-espelho");
+            if (interacao) celular.appendChild(interacao);
         }
 
         // ==================== RENDERIZAÇÃO DA LISTA ====================
@@ -1646,6 +1669,8 @@
         document.getElementById("busca-elementos").addEventListener("input", () => desenharLista(elementosAtuais));
         configurarCamposOverlay();
         configurarGradePadrao();
+        document.getElementById("btn-enviar-padrao").addEventListener("click", enviarPadraoCelulas);
+        document.getElementById("btn-limpar-padrao").addEventListener("click", limparPadraoCelulas);
         ajustarTela();
         atualizarTela();
         atualizarStatusOverlay();
