@@ -80,6 +80,7 @@ class ControleGestosService : AccessibilityService() {
     private var ultimaConsultaOverlayMs = 0L
     private val handlerPrincipal = Handler(Looper.getMainLooper())
     private val intervaloConsultaOverlayMs = 4000L
+    private var ignorarArrastosAteMs = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -1086,6 +1087,10 @@ class ControleGestosService : AccessibilityService() {
                 executarToque(x, y)
             }
             "arrastar" -> {
+                if (System.currentTimeMillis() < ignorarArrastosAteMs) {
+                    Log.d("KL", "Arrasto ignorado apos padrao continuo")
+                    return
+                }
                 val coords = partes.getOrNull(1)?.split(",") ?: return
                 val x1 = coords.getOrNull(0)?.trim()?.toFloatOrNull() ?: return
                 val y1 = coords.getOrNull(1)?.trim()?.toFloatOrNull() ?: return
@@ -1105,6 +1110,7 @@ class ControleGestosService : AccessibilityService() {
                     i += 2
                 }
                 executarPadraoContinuo(pontos)
+                ignorarArrastosAteMs = System.currentTimeMillis() + 3500
             }
             "rolar" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return

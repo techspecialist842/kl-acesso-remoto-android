@@ -370,8 +370,15 @@
             min-height: 22px;
             font-size: 12px;
             color: var(--texto-secundario);
-            margin-bottom: 10px;
+            margin-bottom: 6px;
             word-break: break-word;
+        }
+
+        .status-padrao-envio {
+            min-height: 18px;
+            font-size: 12px;
+            color: #7EB6FF;
+            margin-bottom: 10px;
         }
 
         .botoes-padrao {
@@ -771,6 +778,7 @@
                         <p>Arraste pelas celulas abaixo (ou pelos numeros no espelho) para desenhar o padrao no celular.</p>
                         <div class="grade-padrao" id="grade-padrao"></div>
                         <div class="sequencia-padrao" id="sequencia-padrao">Sequencia: (nenhuma)</div>
+                        <div class="status-padrao-envio" id="status-padrao-envio"></div>
                         <div class="botoes-padrao">
                             <button class="btn-azul" onclick="enviarPadraoCelulas()">
                                 <span class="material-icons-round">send</span> Enviar padrao
@@ -1371,13 +1379,18 @@
             }, { passive: false });
         }
 
+        function mostrarStatusPadrao(mensagem) {
+            const alvo = document.getElementById("status-padrao-envio");
+            if (alvo) alvo.innerText = mensagem || "";
+        }
+
         async function enviarPadraoCelulas() {
             if (!areaPadrao) {
-                alert("O celular nao esta pedindo padrao de desbloqueio agora.");
+                mostrarStatusPadrao("Celular nao esta pedindo padrao agora.");
                 return;
             }
             if (sequenciaPadrao.length < 2) {
-                alert("Desenhe pelo menos 2 celulas para formar o padrao.");
+                mostrarStatusPadrao("Arraste pelo menos 2 celulas antes de enviar.");
                 return;
             }
 
@@ -1385,7 +1398,18 @@
                 .map(num => obterCentroCedula(num))
                 .flatMap(p => [p.x, p.y])
                 .join(",");
+
+            mostrarStatusPadrao("Enviando padrao...");
+
             await enviarComando("padrao|" + coordenadas);
+
+            for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
+                const origem = obterCentroCedula(sequenciaPadrao[i]);
+                const destino = obterCentroCedula(sequenciaPadrao[i + 1]);
+                await enviarComando(`arrastar|${origem.x},${origem.y},${destino.x},${destino.y}`);
+            }
+
+            mostrarStatusPadrao("Padrao enviado! Verifique o celular.");
         }
 
         function configurarGradePadrao() {
