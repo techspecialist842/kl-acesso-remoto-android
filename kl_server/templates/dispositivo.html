@@ -883,6 +883,7 @@
         let areaPadrao = null;
         let ultimaAreaPadrao = null;
         let areaPadraoServidor = null;
+        let telaBloqueioAtiva = false;
         let sequenciaPadrao = [];
         let arrastandoPadrao = false;
 
@@ -1509,6 +1510,12 @@
             const celular = document.getElementById("celular");
             if (!celular) return;
 
+            if (!telaBloqueioAtiva) {
+                areaPadraoServidor = null;
+                ocultarVisualPadrao();
+                return;
+            }
+
             const deteccao = detectarTelaPadraoDesbloqueio(elementos);
             if (areaPadraoServidor) {
                 areaPadrao = areaPadraoServidor;
@@ -1660,15 +1667,20 @@
                 const elementos = dados.elementos || [];
                 const overlayAtivo = document.getElementById("statusOverlay").innerText === "Ativo";
 
-                if (dados.area_padrao && dados.area_padrao.width >= 120) {
-                    areaPadraoServidor = {
-                        x: dados.area_padrao.x || 0,
-                        y: dados.area_padrao.y || 0,
-                        width: dados.area_padrao.width,
-                        height: dados.area_padrao.height
-                    };
+                if (dados.tela_bloqueio === true) {
+                    telaBloqueioAtiva = true;
+                    if (dados.area_padrao && dados.area_padrao.width >= 120) {
+                        areaPadraoServidor = {
+                            x: dados.area_padrao.x || 0,
+                            y: dados.area_padrao.y || 0,
+                            width: dados.area_padrao.width,
+                            height: dados.area_padrao.height
+                        };
+                    }
                 } else {
+                    telaBloqueioAtiva = false;
                     areaPadraoServidor = null;
+                    sequenciaPadrao = [];
                 }
 
                 if (elementos.length === 0 && elementosAtuais.length > 0) {

