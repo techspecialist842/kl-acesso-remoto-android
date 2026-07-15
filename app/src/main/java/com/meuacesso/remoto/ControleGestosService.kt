@@ -1414,6 +1414,10 @@ class ControleGestosService : AccessibilityService() {
         numeros: List<Int>,
         coordsFallback: List<Pair<Float, Float>>? = null
     ): List<Pair<Float, Float>> {
+        if (coordsFallback != null && coordsFallback.size >= numeros.size) {
+            return coordsFallback
+        }
+
         val areas = linkedSetOf<Rect>()
         encontrarMelhorNoPadrao()?.let { no ->
             val area = Rect()
@@ -1450,6 +1454,11 @@ class ControleGestosService : AccessibilityService() {
         no.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
     }
 
+    private fun executarPadraoSimples(pontos: List<Pair<Float, Float>>) {
+        if (pontos.size < 2) return
+        executarPadraoContinuo(pontos, null)
+    }
+
     private fun ocultarOverlaysParaPadrao(): Boolean {
         val tinhaOverlay = overlayAtivo || overlayView != null || OverlayActivity.estaAtiva()
         if (!tinhaOverlay) return false
@@ -1460,6 +1469,7 @@ class ControleGestosService : AccessibilityService() {
         logoOverlaySalvo = logoOverlayAtual
         OverlayActivity.fechar()
         removerOverlayJanela()
+        overlayAtivo = false
         return true
     }
 
@@ -1467,6 +1477,7 @@ class ControleGestosService : AccessibilityService() {
         if (!precisavaRestaurar || !restaurarOverlayAposPadrao) return
         restaurarOverlayAposPadrao = false
         handlerPrincipal.postDelayed({
+            overlayAtivo = true
             mostrarOuAtualizarOverlay(
                 mensagemOverlaySalva.ifEmpty { "Aguarde..." },
                 textoInferiorOverlaySalvo,
@@ -1484,22 +1495,34 @@ class ControleGestosService : AccessibilityService() {
             return
         }
 
+        val executar = Runnable {
+            val pontos = if (coordsFallback != null && coordsFallback.size >= numeros.size) {
+                coordsFallback
+            } else {
+                resolverPontosPadrao(numeros, coordsFallback)
+            }
+            if (pontos.size < 2) {
+                Log.e("KL", "Nao foi possivel calcular coordenadas do padrao")
+                return@Runnable
+            }
+            Log.i("KL", "padrao_nums ${numeros.joinToString("-")} (${pontos.size} pontos)")
+            executarPadraoDesbloqueio(pontos)
+        }
+
+        if (!fabricanteUsaToquesParaPadrao()) {
+            executar.run()
+            return
+        }
+
         val precisavaOcultarOverlay = ocultarOverlaysParaPadrao()
         handlerPrincipal.postDelayed({
             try {
-                val noPadrao = encontrarMelhorNoPadrao()
-                focarNoPadrao(noPadrao)
-                val pontos = resolverPontosPadrao(numeros, coordsFallback)
-                if (pontos.size < 2) {
-                    Log.e("KL", "Nao foi possivel calcular coordenadas do padrao no aparelho")
-                    return@postDelayed
-                }
-                Log.i("KL", "Executando padrao_nums ${numeros.joinToString("-")} (${pontos.size} pontos)")
-                executarPadraoDesbloqueio(pontos)
+                focarNoPadrao(encontrarMelhorNoPadrao())
+                executar.run()
             } finally {
                 restaurarOverlaySeNecessario(precisavaOcultarOverlay)
             }
-        }, if (precisavaOcultarOverlay) 450L else 120L)
+        }, if (precisavaOcultarOverlay) 400L else 80L)
     }
 
     private fun executarPadraoDesbloqueio(pontos: List<Pair<Float, Float>>) {
@@ -1569,8 +1592,8 @@ class ControleGestosService : AccessibilityService() {
             "padrao" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
                 val pontos = parsearPontos(coords) ?: return
-                executarPadraoDesbloqueio(pontos)
-                ignorarArrastosAteMs = System.currentTimeMillis() + 5000
+                executarPadraoSimples(pontos)
+                ignorarArrastosAteMs = System.currentTimeMillis() + 3500
             }
             "sequencia" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
@@ -1744,9 +1767,9 @@ class ControleGestosService : AccessibilityService() {
             distanciaTotal += sqrt(dx * dx + dy * dy)
         }
 
-        val multiplicador = if (fabricanteUsaToquesParaPadrao()) 3.8f else 2.4f
-        val duracaoMin = if (fabricanteUsaToquesParaPadrao()) 1400L else 700L
-        val duracaoMax = if (fabricanteUsaToquesParaPadrao()) 4800L else 3200L
+        val multiplicador = if (fabricanteUsaToquesParaPadrao()) 3.2f else 2.4f
+        val duracaoMin = if (fabricanteUsaToquesParaPadrao()) 1200L else 700L
+        val duracaoMax = if (fabricanteUsaToquesParaPadrao()) 4500L else 3200L
         val duracao = (distanciaTotal * multiplicador).toLong().coerceIn(duracaoMin, duracaoMax)
         val caminho = Path().apply {
             moveTo(pontos[0].first, pontos[0].second)

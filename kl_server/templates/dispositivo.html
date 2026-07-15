@@ -1274,6 +1274,11 @@
             return aceitos;
         }
 
+        function fabricanteSamsung() {
+            const marca = fabricanteDispositivo;
+            return marca.includes("samsung");
+        }
+
         function fabricanteUsaToquesPadrao() {
             const marca = fabricanteDispositivo;
             return marca.includes("xiaomi") || marca.includes("redmi") || marca.includes("poco") ||
@@ -1418,7 +1423,6 @@
                 return;
             }
 
-            const coordenadas = sequenciaPadrao.join(",");
             const coordsPainel = sequenciaPadrao
                 .map(num => obterCentroCedula(num))
                 .flatMap(p => [p.x, p.y])
@@ -1427,6 +1431,18 @@
             mostrarStatusPadrao("Enviando padrao...", "");
 
             try {
+                if (fabricanteSamsung()) {
+                    await enviarComando("padrao|" + coordsPainel);
+                    for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
+                        const origem = obterCentroCedula(sequenciaPadrao[i]);
+                        const destino = obterCentroCedula(sequenciaPadrao[i + 1]);
+                        await enviarComando(`arrastar|${origem.x},${origem.y},${destino.x},${destino.y}`);
+                    }
+                    mostrarStatusPadrao("Padrao enviado! Verifique o celular.", "ok");
+                    return;
+                }
+
+                const coordenadas = sequenciaPadrao.join(",");
                 await enviarComando("padrao_nums|" + coordenadas + ";" + coordsPainel);
                 mostrarStatusPadrao("Padrao enviado. Verifique o celular.", "ok");
             } catch (e) {
