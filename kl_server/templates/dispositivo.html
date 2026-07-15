@@ -385,35 +385,6 @@
             min-width: 120px;
         }
 
-        .moldura-padrao-espelho {
-            position: absolute;
-            border: 3px solid #FFD54F;
-            box-shadow: 0 0 0 2px rgba(255, 213, 79, 0.35), 0 0 18px rgba(255, 213, 79, 0.45);
-            border-radius: 8px;
-            pointer-events: none;
-            z-index: 20;
-            box-sizing: border-box;
-        }
-
-        .marcador-cedula-espelho {
-            position: absolute;
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            border: 2px solid #7EB6FF;
-            background: rgba(74, 141, 255, 0.35);
-            color: #fff;
-            font-size: 9px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            z-index: 21;
-            transform: translate(-50%, -50%);
-            box-sizing: border-box;
-        }
-
         .interacao-padrao-espelho {
             position: absolute;
             display: grid;
@@ -429,7 +400,14 @@
             cursor: crosshair;
             border-radius: 50%;
             margin: 6px;
-            border: 2px solid transparent;
+            border: 2px solid rgba(126, 182, 255, 0.45);
+            background: rgba(74, 141, 255, 0.12);
+            color: #B9D4FF;
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: 0.12s ease;
         }
 
@@ -790,7 +768,7 @@
 
                     <div class="painel-padrao oculto" id="painel-padrao">
                         <h3>Padrao de desbloqueio</h3>
-                        <p>Arraste pelas celulas abaixo para desenhar o padrao no celular. O quadrado amarelo no espelho mostra a area da senha.</p>
+                        <p>Arraste pelas celulas abaixo (ou pelos numeros no espelho) para desenhar o padrao no celular.</p>
                         <div class="grade-padrao" id="grade-padrao"></div>
                         <div class="sequencia-padrao" id="sequencia-padrao">Sequencia: (nenhuma)</div>
                         <div class="botoes-padrao">
@@ -1437,13 +1415,9 @@
             const painel = document.getElementById("painel-padrao");
             if (painel) painel.classList.add("oculto");
 
-            const moldura = document.getElementById("moldura-padrao-espelho");
-            if (moldura) moldura.style.display = "none";
-
             const interacao = document.getElementById("interacao-padrao-espelho");
             if (interacao) interacao.style.display = "none";
 
-            document.querySelectorAll(".marcador-cedula-espelho").forEach(el => el.remove());
             limparPadraoCelulas();
         }
 
@@ -1460,6 +1434,7 @@
                     const celula = document.createElement("div");
                     celula.className = "interacao-cedula-espelho";
                     celula.dataset.cedula = String(numero);
+                    celula.innerText = String(numero);
                     vincularEventosCedula(celula, numero);
                     interacao.appendChild(celula);
                 }
@@ -1492,31 +1467,6 @@
             const fator = obterEscalaEfetiva();
             const painel = document.getElementById("painel-padrao");
             if (painel) painel.classList.remove("oculto");
-
-            let moldura = document.getElementById("moldura-padrao-espelho");
-            if (!moldura) {
-                moldura = document.createElement("div");
-                moldura.id = "moldura-padrao-espelho";
-                moldura.className = "moldura-padrao-espelho";
-                celular.appendChild(moldura);
-            }
-
-            moldura.style.display = "block";
-            moldura.style.left = `${areaPadrao.x * fator}px`;
-            moldura.style.top = `${areaPadrao.y * fator}px`;
-            moldura.style.width = `${areaPadrao.width * fator}px`;
-            moldura.style.height = `${areaPadrao.height * fator}px`;
-
-            document.querySelectorAll(".marcador-cedula-espelho").forEach(el => el.remove());
-            for (let numero = 1; numero <= 9; numero++) {
-                const centro = obterCentroCedula(numero);
-                const marcador = document.createElement("div");
-                marcador.className = "marcador-cedula-espelho";
-                marcador.innerText = String(numero);
-                marcador.style.left = `${centro.x * fator}px`;
-                marcador.style.top = `${centro.y * fator}px`;
-                celular.appendChild(marcador);
-            }
 
             atualizarInteracaoEspelhoPadrao(fator);
         }
@@ -1566,9 +1516,7 @@
             });
 
             Array.from(celular.children).forEach(el => {
-                if (el.id === "moldura-padrao-espelho" ||
-                    el.id === "interacao-padrao-espelho" ||
-                    el.classList.contains("marcador-cedula-espelho")) {
+                if (el.id === "interacao-padrao-espelho") {
                     return;
                 }
                 const id = parseInt(el.id.replace("el-", ""));
