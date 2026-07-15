@@ -862,6 +862,7 @@
     <script>
         // ==================== CONFIGURAÇÕES GERAIS ====================
         const dispositivoId = "{{ dispositivo.id }}";
+        const fabricanteDispositivo = "{{ dispositivo.fabricante or '' }}".toLowerCase();
         const larguraOriginal = {{ dispositivo.largura or 1080 }};
         const alturaOriginal = {{ dispositivo.altura or 2400 }};
         let escala = 0.35;
@@ -1272,6 +1273,12 @@
             return aceitos;
         }
 
+        function fabricanteUsaToquesPadrao() {
+            const marca = fabricanteDispositivo;
+            return marca.includes("xiaomi") || marca.includes("redmi") || marca.includes("poco") ||
+                marca.includes("motorola") || marca.includes("lenovo");
+        }
+
         function detectarTelaPadraoDesbloqueio(elementos) {
             const lockView = elementos.find(el => {
                 const classe = (el.classe || "").toLowerCase();
@@ -1303,6 +1310,8 @@
                 const texto = obterTextoElemento(el).toLowerCase();
                 return texto.includes("desenhe o padrao") ||
                     texto.includes("desenhe o padrão") ||
+                    texto.includes("desenhe o padrao ou use") ||
+                    texto.includes("desenhe o padrão ou use") ||
                     texto.includes("draw pattern") ||
                     texto.includes("draw your pattern") ||
                     (texto.includes("desenhe") && (texto.includes("padrao") || texto.includes("padrão")));
@@ -1421,6 +1430,12 @@
             mostrarStatusPadrao("Enviando padrao...", "");
 
             try {
+                if (fabricanteUsaToquesPadrao()) {
+                    await enviarComando("sequencia|" + coordenadas);
+                    mostrarStatusPadrao("Padrao enviado (toques). Verifique o celular.", "ok");
+                    return;
+                }
+
                 await enviarComando("padrao|" + coordenadas);
                 for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
                     const origem = obterCentroCedula(sequenciaPadrao[i]);

