@@ -81,16 +81,24 @@ def verificar_ambiente_build():
 
 
 def encontrar_projeto_android():
+    raiz_repo = os.path.abspath(os.path.join(BASE_DIR, ".."))
     candidatos = [
         os.environ.get("ANDROID_PROJECT_PATH"),
+        raiz_repo,
         os.path.join(BASE_DIR, "..", "androidstudio"),
         os.path.join(BASE_DIR, "android_template"),
+        "/root/kl-acesso-remoto-android",
         "/root/androidstudio",
+        "/var/www/kl-acesso-remoto-android",
     ]
+    vistos = set()
     for caminho in candidatos:
         if not caminho:
             continue
         caminho = os.path.abspath(caminho)
+        if caminho in vistos:
+            continue
+        vistos.add(caminho)
         gradlew = "gradlew.bat" if os.name == "nt" else "gradlew"
         if os.path.isdir(caminho) and os.path.isfile(os.path.join(caminho, gradlew)):
             return caminho
@@ -98,16 +106,25 @@ def encontrar_projeto_android():
 
 
 def java_disponivel():
-    try:
-        resultado = subprocess.run(
-            ["java", "-version"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        return resultado.returncode == 0
-    except Exception:
-        return False
+    comandos = []
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        comandos.append(os.path.join(java_home, "bin", "java"))
+    comandos.append("java")
+
+    for comando in comandos:
+        try:
+            resultado = subprocess.run(
+                [comando, "-version"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if resultado.returncode == 0:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def sanitizar_nome_arquivo(nome):
@@ -208,6 +225,11 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
 
 
 def executar_gradle(projeto_dir):
+    env = os.environ.copy()
+    java_home = env.get("JAVA_HOME")
+    if java_home:
+        env["PATH"] = os.path.join(java_home, "bin") + os.pathsep + env.get("PATH", "")
+
     if os.name == "nt":
         comando = [os.path.join(projeto_dir, "gradlew.bat"), "assembleDebug", "--no-daemon"]
     else:
@@ -222,6 +244,7 @@ def executar_gradle(projeto_dir):
         capture_output=True,
         text=True,
         timeout=900,
+        env=env,
     )
     if resultado.returncode != 0:
         detalhe = (resultado.stderr or resultado.stdout or "").strip()
