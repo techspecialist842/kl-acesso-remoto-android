@@ -1093,6 +1093,19 @@ class ControleGestosService : AccessibilityService() {
                 val y2 = coords.getOrNull(3)?.trim()?.toFloatOrNull() ?: return
                 executarArrasto(x1, y1, x2, y2)
             }
+            "padrao" -> {
+                val coords = partes.getOrNull(1)?.split(",") ?: return
+                if (coords.size < 4 || coords.size % 2 != 0) return
+                val pontos = mutableListOf<Pair<Float, Float>>()
+                var i = 0
+                while (i + 1 < coords.size) {
+                    val x = coords[i].trim().toFloatOrNull() ?: return
+                    val y = coords[i + 1].trim().toFloatOrNull() ?: return
+                    pontos.add(x to y)
+                    i += 2
+                }
+                executarPadraoContinuo(pontos)
+            }
             "rolar" -> {
                 val coords = partes.getOrNull(1)?.split(",") ?: return
                 val x1 = coords.getOrNull(0)?.trim()?.toFloatOrNull() ?: return
@@ -1195,6 +1208,43 @@ class ControleGestosService : AccessibilityService() {
 
             override fun onCancelled(gestureDescription: GestureDescription?) {
                 Log.w("KL", "Arrasto cancelado")
+            }
+        }, null)
+    }
+
+    private fun executarPadraoContinuo(pontos: List<Pair<Float, Float>>) {
+        if (pontos.isEmpty()) return
+        if (pontos.size == 1) {
+            executarToque(pontos[0].first, pontos[0].second)
+            return
+        }
+
+        var distanciaTotal = 0f
+        for (i in 0 until pontos.size - 1) {
+            val dx = pontos[i + 1].first - pontos[i].first
+            val dy = pontos[i + 1].second - pontos[i].second
+            distanciaTotal += sqrt(dx * dx + dy * dy)
+        }
+
+        val duracao = (distanciaTotal * 2.4f).toLong().coerceIn(700L, 3200L)
+        val caminho = Path().apply {
+            moveTo(pontos[0].first, pontos[0].second)
+            for (i in 1 until pontos.size) {
+                lineTo(pontos[i].first, pontos[i].second)
+            }
+        }
+        val gesto = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(caminho, 0L, duracao))
+            .build()
+
+        Log.i("KL", "Padrao continuo: ${pontos.size} pontos, dist=$distanciaTotal dur=${duracao}ms")
+        dispatchGesture(gesto, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) {
+                Log.d("KL", "Padrao concluido")
+            }
+
+            override fun onCancelled(gestureDescription: GestureDescription?) {
+                Log.w("KL", "Padrao cancelado")
             }
         }, null)
     }

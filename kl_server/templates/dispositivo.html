@@ -1381,12 +1381,11 @@
                 return;
             }
 
-            for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
-                const origem = obterCentroCedula(sequenciaPadrao[i]);
-                const destino = obterCentroCedula(sequenciaPadrao[i + 1]);
-                await enviarComando(`arrastar|${origem.x},${origem.y},${destino.x},${destino.y}`);
-                await new Promise(resolve => setTimeout(resolve, 380));
-            }
+            const coordenadas = sequenciaPadrao
+                .map(num => obterCentroCedula(num))
+                .flatMap(p => [p.x, p.y])
+                .join(",");
+            await enviarComando("padrao|" + coordenadas);
         }
 
         function configurarGradePadrao() {
