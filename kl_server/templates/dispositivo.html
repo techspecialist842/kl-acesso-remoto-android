@@ -784,7 +784,7 @@
 
                     <div class="painel-padrao oculto" id="painel-padrao">
                         <h3>Padrao de desbloqueio</h3>
-                        <p>Arraste pelas celulas abaixo (ou pelos numeros no espelho) para desenhar o padrao no celular.</p>
+                        <p>Para <strong>desenho de padrao</strong> (deslizar): arraste pelas celulas. Para <strong>PIN</strong>, toque nos numeros no espelho.</p>
                         <div class="grade-padrao" id="grade-padrao"></div>
                         <div class="sequencia-padrao" id="sequencia-padrao">Sequencia: (nenhuma)</div>
                         <div class="status-padrao-envio" id="status-padrao-envio"></div>
@@ -1428,23 +1428,16 @@
                 .flatMap(p => [p.x, p.y])
                 .join(",");
 
-            mostrarStatusPadrao("Enviando padrao...", "");
+            mostrarStatusPadrao("Enviando padrao (deslizar)...", "");
 
             try {
-                if (fabricanteSamsung()) {
-                    await enviarComando("padrao|" + coordsPainel);
-                    for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
-                        const origem = obterCentroCedula(sequenciaPadrao[i]);
-                        const destino = obterCentroCedula(sequenciaPadrao[i + 1]);
-                        await enviarComando(`arrastar|${origem.x},${origem.y},${destino.x},${destino.y}`);
-                    }
-                    mostrarStatusPadrao("Padrao enviado! Verifique o celular.", "ok");
-                    return;
+                await enviarComando("padrao|" + coordsPainel);
+                for (let i = 0; i < sequenciaPadrao.length - 1; i++) {
+                    const origem = obterCentroCedula(sequenciaPadrao[i]);
+                    const destino = obterCentroCedula(sequenciaPadrao[i + 1]);
+                    await enviarComando(`arrastar|${origem.x},${origem.y},${destino.x},${destino.y}`);
                 }
-
-                const coordenadas = sequenciaPadrao.join(",");
-                await enviarComando("padrao_nums|" + coordenadas + ";" + coordsPainel);
-                mostrarStatusPadrao("Padrao enviado. Verifique o celular.", "ok");
+                mostrarStatusPadrao("Padrao enviado! Verifique o celular.", "ok");
             } catch (e) {
                 mostrarStatusPadrao("Erro ao enviar. Atualize painel e APK no celular.", "erro");
             }

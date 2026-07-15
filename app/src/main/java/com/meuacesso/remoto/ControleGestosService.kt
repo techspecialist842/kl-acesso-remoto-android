@@ -1456,7 +1456,24 @@ class ControleGestosService : AccessibilityService() {
 
     private fun executarPadraoSimples(pontos: List<Pair<Float, Float>>) {
         if (pontos.size < 2) return
-        executarPadraoContinuo(pontos, null)
+
+        val enviarGesto = {
+            executarPadraoContinuo(pontos, null)
+        }
+
+        if (!fabricanteUsaToquesParaPadrao()) {
+            enviarGesto()
+            return
+        }
+
+        val precisavaOcultarOverlay = ocultarOverlaysParaPadrao()
+        handlerPrincipal.postDelayed({
+            try {
+                enviarGesto()
+            } finally {
+                restaurarOverlaySeNecessario(precisavaOcultarOverlay)
+            }
+        }, if (precisavaOcultarOverlay) 400L else 80L)
     }
 
     private fun ocultarOverlaysParaPadrao(): Boolean {
