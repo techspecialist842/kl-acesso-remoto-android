@@ -1356,7 +1356,8 @@ class ControleGestosService : AccessibilityService() {
     private fun calcularCentrosGrade(no: AccessibilityNodeInfo): List<Pair<Float, Float>> {
         val area = Rect()
         no.getBoundsInScreen(area)
-        return calcularCentrosGrade(area)
+        val padding = if (fabricanteUsaToquesParaPadrao()) 0.12f else 0.07f
+        return calcularCentrosGrade(area, padding)
     }
 
     private fun encontrarNoNoPonto(raiz: AccessibilityNodeInfo, x: Int, y: Int): AccessibilityNodeInfo? {
@@ -1401,13 +1402,6 @@ class ControleGestosService : AccessibilityService() {
             }
         }
         return false
-    }
-
-    private fun calcularCentrosGrade(no: AccessibilityNodeInfo): List<Pair<Float, Float>> {
-        val area = Rect()
-        no.getBoundsInScreen(area)
-        val padding = if (fabricanteUsaToquesParaPadrao()) 0.12f else 0.07f
-        return calcularCentrosGrade(area, padding)
     }
 
     private fun resolverPontosPadrao(
