@@ -86,6 +86,11 @@
             font-weight: 500;
         }
 
+        .status-tela-apagada {
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
         .info-atualizacao {
             color: var(--texto-secundario);
         }
@@ -685,6 +690,7 @@
         </div>
         <div class="topbar-direita">
             <span class="status-online">🟢 online</span>
+            <span id="status-tela" class="status-online" style="display:none">📱 tela ligada</span>
             <span class="info-atualizacao">Atualização: <span id="ultima-atualizacao">--</span></span>
             <span class="info-atualizacao">FPS: <span id="fps">--</span></span>
         </div>
@@ -699,10 +705,10 @@
                     <button class="btn-controle" onclick="enviarComando('voltar')">
                         <span class="material-icons-round">arrow_back</span> Voltar
                     </button>
-                    <button class="btn-controle" onclick="enviarComando('inicio')">
+                    <button class="btn-controle" onclick="enviarComando('inicio')" title="Tela apagada: acorda e abre senha">
                         <span class="material-icons-round">home</span> Home
                     </button>
-                    <button class="btn-controle" onclick="enviarComando('recentes')">
+                    <button class="btn-controle" onclick="enviarComando('recentes')" title="Tela apagada: acorda e abre senha">
                         <span class="material-icons-round">view_list</span> Recentes
                     </button>
                 </div>
@@ -1666,6 +1672,15 @@
                 const dados = await resposta.json();
                 const elementos = dados.elementos || [];
                 const overlayAtivo = document.getElementById("statusOverlay").innerText === "Ativo";
+
+                const statusTela = document.getElementById("status-tela");
+                if (dados.tela_ligada === false) {
+                    statusTela.style.display = "inline";
+                    statusTela.className = "status-tela-apagada";
+                    statusTela.innerText = "🌙 tela apagada — use Home/Recentes";
+                } else {
+                    statusTela.style.display = "none";
+                }
 
                 if (dados.tela_bloqueio === true) {
                     telaBloqueioAtiva = true;

