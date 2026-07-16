@@ -35,8 +35,13 @@ baixar "scripts/instalar_servidor_novo.sh" "$BASE_URL/scripts/instalar_servidor_
 baixar "scripts/atualizar_arquivos_vps.sh" "$BASE_URL/scripts/atualizar_arquivos_vps.sh"
 baixar "services/apk_builder.py"       "$BASE_URL/services/apk_builder.py"
 baixar "services/apk_jobs.py"          "$BASE_URL/services/apk_jobs.py"
-baixar "routes/apk.py"                 "$BASE_URL/routes/apk.py"
-baixar "templates/gerar_apk.html"      "$BASE_URL/templates/gerar_apk.html"
+baixar "routes/apk.py"                   "$BASE_URL/routes/apk.py"
+baixar "routes/branding.py"              "$BASE_URL/routes/branding.py"
+baixar "services/branding.py"            "$BASE_URL/services/branding.py"
+baixar "templates/gerar_apk.html"        "$BASE_URL/templates/gerar_apk.html"
+baixar "templates/personalizar.html"     "$BASE_URL/templates/personalizar.html"
+baixar "templates/painel.html"           "$BASE_URL/templates/painel.html"
+baixar "templates/dispositivo.html"      "$BASE_URL/templates/dispositivo.html"
 
 chmod +x scripts/setup_apk_builder.sh
 chmod +x scripts/corrigir_nginx_apk.sh
