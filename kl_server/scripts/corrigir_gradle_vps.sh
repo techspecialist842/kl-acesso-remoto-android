@@ -23,4 +23,12 @@ else
 fi
 
 echo "OK: uname=$(command -v uname) xargs=$(command -v xargs)"
+
+REPO_DIR="${REPO_DIR:-/root/kl-acesso-remoto-android}"
+if [ -f "$REPO_DIR/gradlew" ]; then
+  echo "==> Parando daemons Gradle antigos..."
+  cd "$REPO_DIR"
+  ./gradlew --stop >/dev/null 2>&1 || true
+fi
+
 echo "Reinicie o gunicorn e tente gerar o APK novamente."

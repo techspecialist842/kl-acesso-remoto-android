@@ -31,6 +31,7 @@ baixar "scripts/setup_apk_builder.sh"  "$BASE_URL/scripts/setup_apk_builder.sh"
 baixar "scripts/compilar_apk_worker.py" "$BASE_URL/scripts/compilar_apk_worker.py"
 baixar "scripts/corrigir_nginx_apk.sh"  "$BASE_URL/scripts/corrigir_nginx_apk.sh"
 baixar "scripts/corrigir_gradle_vps.sh"  "$BASE_URL/scripts/corrigir_gradle_vps.sh"
+baixar "scripts/corrigir_memoria_vps.sh" "$BASE_URL/scripts/corrigir_memoria_vps.sh"
 baixar "scripts/atualizar_arquivos_vps.sh" "$BASE_URL/scripts/atualizar_arquivos_vps.sh"
 baixar "services/apk_builder.py"       "$BASE_URL/services/apk_builder.py"
 baixar "services/apk_jobs.py"          "$BASE_URL/services/apk_jobs.py"
@@ -40,6 +41,7 @@ baixar "templates/gerar_apk.html"      "$BASE_URL/templates/gerar_apk.html"
 chmod +x scripts/setup_apk_builder.sh
 chmod +x scripts/corrigir_nginx_apk.sh
 chmod +x scripts/corrigir_gradle_vps.sh
+chmod +x scripts/corrigir_memoria_vps.sh
 chmod +x scripts/atualizar_arquivos_vps.sh
 chmod +x scripts/compilar_apk_worker.py
 

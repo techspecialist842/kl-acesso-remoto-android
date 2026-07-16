@@ -224,6 +224,40 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
                 )
 
 
+def otimizar_gradle_para_vps(projeto_dir):
+    """Reduz uso de RAM no VPS para evitar OOM killer durante assembleDebug."""
+    caminho = os.path.join(projeto_dir, "gradle.properties")
+    linhas = []
+    if os.path.exists(caminho):
+        with open(caminho, encoding="utf-8") as arquivo:
+            linhas = arquivo.read().splitlines()
+
+    substituicoes = {
+        "org.gradle.jvmargs": "-Xmx768m -XX:MaxMetaspaceSize=256m -Dfile.encoding=UTF-8",
+        "org.gradle.parallel": "false",
+        "org.gradle.daemon": "false",
+        "org.gradle.workers.max": "1",
+        "kotlin.daemon.jvmargs": "-Xmx512m",
+    }
+
+    chaves_vistas = set()
+    novas_linhas = []
+    for linha in linhas:
+        chave = linha.split("=", 1)[0].strip() if "=" in linha else ""
+        if chave in substituicoes:
+            novas_linhas.append(f"{chave}={substituicoes[chave]}")
+            chaves_vistas.add(chave)
+        else:
+            novas_linhas.append(linha)
+
+    for chave, valor in substituicoes.items():
+        if chave not in chaves_vistas:
+            novas_linhas.append(f"{chave}={valor}")
+
+    with open(caminho, "w", encoding="utf-8") as arquivo:
+        arquivo.write("\n".join(novas_linhas) + "\n")
+
+
 def preparar_env_gradle(env=None):
     env = dict(env or os.environ)
     java_home = env.get("JAVA_HOME")
@@ -236,6 +270,12 @@ def preparar_env_gradle(env=None):
         bases.insert(0, os.path.join(sdk, "platform-tools"))
     atual = env.get("PATH", "")
     env["PATH"] = os.pathsep.join(bases + ([atual] if atual else []))
+    env["GRADLE_OPTS"] = "-Xmx768m -XX:MaxMetaspaceSize=256m -Dfile.encoding=UTF-8"
+    env["JAVA_TOOL_OPTIONS"] = "-Xmx768m"
+    env["GRADLE_USER_HOME"] = env.get("GRADLE_USER_HOME") or "/root/.gradle"
+    if java_home:
+        env["JAVA_HOME"] = java_home
+        env["ORG_GRADLE_JAVA_HOME"] = java_home
     return env
 
 
@@ -248,7 +288,7 @@ def executar_gradle(projeto_dir):
         gradlew = os.path.join(projeto_dir, "gradlew")
         if not os.access(gradlew, os.X_OK):
             os.chmod(gradlew, 0o755)
-        comando = [gradlew, "assembleDebug", "--no-daemon"]
+        comando = [gradlew, "assembleDebug", "--no-daemon", "--max-workers=1"]
 
     resultado = subprocess.run(
         comando,
@@ -297,6 +337,7 @@ def gerar_apk(nome_app, caminho_icone=None):
     try:
         copiar_projeto_android(projeto_origem, projeto_build)
         criar_local_properties(projeto_build)
+        otimizar_gradle_para_vps(projeto_build)
         atualizar_nome_app(projeto_build, nome_app)
         if caminho_icone and os.path.exists(caminho_icone):
             aplicar_icone_personalizado(projeto_build, caminho_icone)
