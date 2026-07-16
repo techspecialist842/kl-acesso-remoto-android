@@ -1,66 +1,81 @@
+import json
 import os
-import threading
+import subprocess
+import sys
 import time
 import uuid
 
-from services.apk_builder import gerar_apk
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+JOBS_DIR = os.path.join(BASE_DIR, "data", "apk_jobs")
+WORKER_SCRIPT = os.path.join(BASE_DIR, "scripts", "compilar_apk_worker.py")
+ENV_FILE = os.path.join(BASE_DIR, "apk_builder.env")
 
-_jobs = {}
-_lock = threading.Lock()
-MAX_JOBS = 20
+
+def _carregar_env_arquivo():
+    if not os.path.exists(ENV_FILE):
+        return
+    with open(ENV_FILE, encoding="utf-8") as arquivo:
+        for linha in arquivo:
+            linha = linha.strip()
+            if not linha or linha.startswith("#") or "=" not in linha:
+                continue
+            chave, _, valor = linha.partition("=")
+            chave = chave.strip()
+            valor = valor.strip()
+            if chave and valor and chave not in os.environ:
+                os.environ[chave] = valor
 
 
-def _limpar_jobs_antigos():
-    agora = time.time()
-    with _lock:
-        expirados = [
-            job_id
-            for job_id, dados in _jobs.items()
-            if agora - dados.get("criado_em", agora) > 3600
-        ]
-        for job_id in expirados:
-            _jobs.pop(job_id, None)
+def _caminho_job(job_id):
+    return os.path.join(JOBS_DIR, f"{job_id}.json")
+
+
+def _ler_job(job_id):
+    caminho = _caminho_job(job_id)
+    if not os.path.exists(caminho):
+        return None
+    with open(caminho, encoding="utf-8") as arquivo:
+        return json.load(arquivo)
+
+
+def _salvar_job(job_id, dados):
+    os.makedirs(JOBS_DIR, exist_ok=True)
+    with open(_caminho_job(job_id), "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo, ensure_ascii=False)
 
 
 def criar_job(nome_app, caminho_icone=None):
-    _limpar_jobs_antigos()
+    _carregar_env_arquivo()
+    os.makedirs(JOBS_DIR, exist_ok=True)
 
     job_id = uuid.uuid4().hex
-    with _lock:
-        if len(_jobs) >= MAX_JOBS:
-            raise RuntimeError("Muitas compilacoes em andamento. Aguarde e tente novamente.")
-        _jobs[job_id] = {
-            "status": "processando",
-            "criado_em": time.time(),
-            "nome_app": nome_app,
-            "erro": None,
-            "resultado": None,
-        }
+    dados = {
+        "job_id": job_id,
+        "status": "processando",
+        "criado_em": time.time(),
+        "nome_app": nome_app,
+        "icone": caminho_icone,
+        "erro": None,
+        "resultado": None,
+    }
+    _salvar_job(job_id, dados)
 
-    def worker():
-        try:
-            resultado = gerar_apk(nome_app, caminho_icone)
-            with _lock:
-                _jobs[job_id]["status"] = "ok"
-                _jobs[job_id]["resultado"] = resultado
-        except Exception as exc:
-            with _lock:
-                _jobs[job_id]["status"] = "erro"
-                _jobs[job_id]["erro"] = str(exc)
-        finally:
-            if caminho_icone and os.path.exists(caminho_icone):
-                try:
-                    os.remove(caminho_icone)
-                except OSError:
-                    pass
+    python_exe = sys.executable
+    env = os.environ.copy()
+    log_path = os.path.join(JOBS_DIR, f"{job_id}.log")
 
-    threading.Thread(target=worker, daemon=True).start()
+    with open(log_path, "w", encoding="utf-8") as log_arquivo:
+        subprocess.Popen(
+            [python_exe, WORKER_SCRIPT, job_id],
+            cwd=BASE_DIR,
+            env=env,
+            stdout=log_arquivo,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
     return job_id
 
 
 def obter_job(job_id):
-    with _lock:
-        dados = _jobs.get(job_id)
-        if not dados:
-            return None
-        return dict(dados)
+    return _ler_job(job_id)

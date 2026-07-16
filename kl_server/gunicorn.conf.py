@@ -14,5 +14,5 @@ if os.path.exists(_env_file):
                 os.environ[chave] = valor
 
 bind = "127.0.0.1:9001"
-workers = 1
+workers = 2
 timeout = 1200

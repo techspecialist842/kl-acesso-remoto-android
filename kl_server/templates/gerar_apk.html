@@ -209,9 +209,8 @@ gunicorn -c gunicorn.conf.py app:app</code>
             } catch (_erro) {
                 if (texto.trim().startsWith("<")) {
                     throw new Error(
-                        "Servidor retornou HTML em vez de JSON. " +
-                        "A compilacao pode ter demorado demais (timeout do nginx). " +
-                        "Atualize a pagina e tente novamente."
+                        `Erro HTTP ${resposta.status}: servidor retornou HTML. ` +
+                        "Rode no VPS: bash scripts/corrigir_nginx_apk.sh e reinicie o gunicorn."
                     );
                 }
                 throw new Error(texto.slice(0, 200) || "Resposta invalida do servidor");

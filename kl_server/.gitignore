@@ -6,3 +6,4 @@ __pycache__/
 apk_builder.env
 data/apks/
 data/apk_icons/
+data/apk_jobs/
