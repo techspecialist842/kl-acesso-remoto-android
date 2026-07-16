@@ -202,6 +202,29 @@ gunicorn -c gunicorn.conf.py app:app</code>
             status.textContent = mensagem;
         }
 
+        async function fetchComRetry(url, opcoes = {}, tentativasMax = 8) {
+            let ultimoErro = null;
+            for (let i = 1; i <= tentativasMax; i++) {
+                try {
+                    const resposta = await fetch(url, opcoes);
+                    if ([502, 503, 504].includes(resposta.status) && i < tentativasMax) {
+                        mostrarStatus("info", `Servidor ocupado (${resposta.status}). Tentando de novo... ${i}/${tentativasMax}`);
+                        await new Promise((resolve) => setTimeout(resolve, 4000));
+                        continue;
+                    }
+                    return resposta;
+                } catch (erro) {
+                    ultimoErro = erro;
+                    if (i < tentativasMax) {
+                        mostrarStatus("info", `Conexao instavel. Tentando de novo... ${i}/${tentativasMax}`);
+                        await new Promise((resolve) => setTimeout(resolve, 4000));
+                        continue;
+                    }
+                }
+            }
+            throw ultimoErro || new Error("Falha de conexao com o servidor");
+        }
+
         async function lerRespostaJson(resposta) {
             const texto = await resposta.text();
             try {
@@ -225,7 +248,7 @@ gunicorn -c gunicorn.conf.py app:app</code>
                 tentativas += 1;
                 await new Promise((resolve) => setTimeout(resolve, 3000));
 
-                const resposta = await fetch(`/api/gerar-apk/status/${jobId}`);
+                const resposta = await fetchComRetry(`/api/gerar-apk/status/${jobId}`);
                 const json = await lerRespostaJson(resposta);
 
                 if (json.status === "processando") {
