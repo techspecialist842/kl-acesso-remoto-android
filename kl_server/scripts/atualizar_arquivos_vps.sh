@@ -30,6 +30,7 @@ baixar "app.py"                        "$BASE_URL/app.py"
 baixar "scripts/setup_apk_builder.sh"  "$BASE_URL/scripts/setup_apk_builder.sh"
 baixar "scripts/atualizar_arquivos_vps.sh" "$BASE_URL/scripts/atualizar_arquivos_vps.sh"
 baixar "services/apk_builder.py"       "$BASE_URL/services/apk_builder.py"
+baixar "services/apk_jobs.py"          "$BASE_URL/services/apk_jobs.py"
 baixar "routes/apk.py"                 "$BASE_URL/routes/apk.py"
 baixar "templates/gerar_apk.html"      "$BASE_URL/templates/gerar_apk.html"
 

@@ -120,6 +120,12 @@
             white-space: pre-wrap;
             font-size: 13px;
         }
+
+        .status.info {
+            display: block;
+            background: #eef4ff;
+            color: #1d4ed8;
+        }
     </style>
 </head>
 <body>
@@ -196,11 +202,58 @@ gunicorn -c gunicorn.conf.py app:app</code>
             status.textContent = mensagem;
         }
 
+        async function lerRespostaJson(resposta) {
+            const texto = await resposta.text();
+            try {
+                return JSON.parse(texto);
+            } catch (_erro) {
+                if (texto.trim().startsWith("<")) {
+                    throw new Error(
+                        "Servidor retornou HTML em vez de JSON. " +
+                        "A compilacao pode ter demorado demais (timeout do nginx). " +
+                        "Atualize a pagina e tente novamente."
+                    );
+                }
+                throw new Error(texto.slice(0, 200) || "Resposta invalida do servidor");
+            }
+        }
+
+        async function aguardarJob(jobId) {
+            let tentativas = 0;
+            const maxTentativas = 400;
+
+            while (tentativas < maxTentativas) {
+                tentativas += 1;
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+
+                const resposta = await fetch(`/api/gerar-apk/status/${jobId}`);
+                const json = await lerRespostaJson(resposta);
+
+                if (json.status === "processando") {
+                    const minutos = Math.floor((tentativas * 3) / 60);
+                    const segundos = (tentativas * 3) % 60;
+                    mostrarStatus(
+                        "info",
+                        `Compilando APK... ${minutos}m ${segundos}s (primeira vez pode levar 10+ min)`
+                    );
+                    continue;
+                }
+
+                if (json.status === "erro" || !resposta.ok) {
+                    throw new Error(json.erro || "Falha ao gerar APK");
+                }
+
+                return json;
+            }
+
+            throw new Error("Tempo limite excedido. Verifique os logs do servidor.");
+        }
+
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
             linkDownload.style.display = "none";
             btnGerar.disabled = true;
-            mostrarStatus("info", "Gerando APK... isso pode levar alguns minutos.");
+            mostrarStatus("info", "Iniciando compilacao do APK...");
 
             const dados = new FormData(form);
 
@@ -209,18 +262,23 @@ gunicorn -c gunicorn.conf.py app:app</code>
                     method: "POST",
                     body: dados
                 });
-                const json = await resposta.json();
+                const json = await lerRespostaJson(resposta);
 
                 if (!resposta.ok) {
-                    throw new Error(json.erro || "Falha ao gerar APK");
+                    throw new Error(json.erro || "Falha ao iniciar geracao do APK");
                 }
 
-                const tamanhoMb = (json.tamanho_bytes / (1024 * 1024)).toFixed(2);
+                if (!json.job_id) {
+                    throw new Error("Servidor nao retornou job_id. Atualize os arquivos do VPS.");
+                }
+
+                const resultado = await aguardarJob(json.job_id);
+                const tamanhoMb = (resultado.tamanho_bytes / (1024 * 1024)).toFixed(2);
                 mostrarStatus(
                     "ok",
-                    `APK "${json.nome_app}" gerado com sucesso (${tamanhoMb} MB).`
+                    `APK "${resultado.nome_app}" gerado com sucesso (${tamanhoMb} MB).`
                 );
-                linkDownload.href = json.download_url;
+                linkDownload.href = resultado.download_url;
                 linkDownload.style.display = "inline-block";
                 linkDownload.textContent = "Baixar APK";
             } catch (erro) {

@@ -4,7 +4,8 @@ import uuid
 from flask import Blueprint, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, gerar_apk, verificar_ambiente_build
+from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, verificar_ambiente_build
+from services.apk_jobs import criar_job, obter_job
 
 
 bp = Blueprint("apk", __name__)
@@ -28,6 +29,10 @@ def api_gerar_apk():
     if not nome_app:
         return jsonify({"erro": "Informe o nome do aplicativo"}), 400
 
+    ambiente = verificar_ambiente_build()
+    if not ambiente.get("pronto"):
+        return jsonify({"erro": "Servidor incompleto para gerar APK"}), 503
+
     caminho_icone = None
     arquivo_icone = request.files.get("icone")
     if arquivo_icone and arquivo_icone.filename:
@@ -44,16 +49,44 @@ def api_gerar_apk():
         arquivo_icone.save(caminho_icone)
 
     try:
-        resultado = gerar_apk(nome_app, caminho_icone)
-        return jsonify({"status": "ok", **resultado})
+        job_id = criar_job(nome_app, caminho_icone)
+        return jsonify({
+            "status": "processando",
+            "job_id": job_id,
+            "mensagem": "Compilacao iniciada. Aguarde...",
+        })
     except Exception as exc:
-        return jsonify({"erro": str(exc)}), 500
-    finally:
         if caminho_icone and os.path.exists(caminho_icone):
             try:
                 os.remove(caminho_icone)
             except OSError:
                 pass
+        return jsonify({"erro": str(exc)}), 500
+
+
+@bp.get("/api/gerar-apk/status/<job_id>")
+def api_status_gerar_apk(job_id):
+    dados = obter_job(job_id)
+    if not dados:
+        return jsonify({"erro": "Job nao encontrado"}), 404
+
+    if dados["status"] == "processando":
+        return jsonify({
+            "status": "processando",
+            "nome_app": dados.get("nome_app"),
+        })
+
+    if dados["status"] == "erro":
+        return jsonify({
+            "status": "erro",
+            "erro": dados.get("erro") or "Falha ao gerar APK",
+        })
+
+    resultado = dados.get("resultado") or {}
+    return jsonify({
+        "status": "ok",
+        **resultado,
+    })
 
 
 @bp.get("/download/apk/<path:nome_arquivo>")
