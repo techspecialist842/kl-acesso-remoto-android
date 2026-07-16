@@ -176,6 +176,22 @@ def atualizar_nome_app(projeto_dir, nome_app):
         arquivo.write(conteudo)
 
 
+def limpar_recursos_icone_antigos(res_dir):
+    """Remove PNG/WebP antigos para evitar Duplicate resources no Gradle."""
+    nomes = {"ic_launcher", "ic_launcher_round"}
+    for raiz, _, arquivos in os.walk(res_dir):
+        pasta = os.path.basename(raiz)
+        if not pasta.startswith("mipmap"):
+            continue
+        for arquivo in arquivos:
+            nome, ext = os.path.splitext(arquivo)
+            if nome in nomes and ext.lower() in {".png", ".webp", ".jpg", ".jpeg"}:
+                try:
+                    os.remove(os.path.join(raiz, arquivo))
+                except OSError:
+                    pass
+
+
 def aplicar_icone_personalizado(projeto_dir, caminho_icone):
     try:
         from PIL import Image
@@ -185,6 +201,7 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
         ) from exc
 
     res_dir = os.path.join(projeto_dir, "app", "src", "main", "res")
+    limpar_recursos_icone_antigos(res_dir)
     drawable_dir = os.path.join(res_dir, "drawable")
     os.makedirs(drawable_dir, exist_ok=True)
 
@@ -213,8 +230,8 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
 
     for nome_xml in ("ic_launcher.xml", "ic_launcher_round.xml"):
         caminho_xml = os.path.join(res_dir, "mipmap-anydpi", nome_xml)
-        if os.path.exists(caminho_xml):
-            with open(caminho_xml, "w", encoding="utf-8") as arquivo:
+        os.makedirs(os.path.dirname(caminho_xml), exist_ok=True)
+        with open(caminho_xml, "w", encoding="utf-8") as arquivo:
                 arquivo.write(
                     '<?xml version="1.0" encoding="utf-8"?>\n'
                     '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
@@ -222,6 +239,23 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
                     '    <foreground android:drawable="@drawable/ic_launcher_custom" />\n'
                     "</adaptive-icon>\n"
                 )
+
+
+def detectar_heap_gradle():
+    """Ajusta RAM do Gradle conforme memoria do servidor."""
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as arquivo:
+            for linha in arquivo:
+                if linha.startswith("MemTotal:"):
+                    kb = int(linha.split()[1])
+                    if kb >= 7_000_000:
+                        return "2048m", "512m"
+                    if kb >= 3_000_000:
+                        return "1536m", "384m"
+                    return "768m", "256m"
+    except Exception:
+        pass
+    return "1024m", "320m"
 
 
 def encontrar_java_home():
@@ -265,12 +299,13 @@ def otimizar_gradle_para_vps(projeto_dir):
         with open(caminho, encoding="utf-8") as arquivo:
             linhas = arquivo.read().splitlines()
 
+    heap, metaspace = detectar_heap_gradle()
     substituicoes = {
-        "org.gradle.jvmargs": "-Xmx512m -XX:MaxMetaspaceSize=192m -Dfile.encoding=UTF-8",
-        "org.gradle.parallel": "false",
+        "org.gradle.jvmargs": f"-Xmx{heap} -XX:MaxMetaspaceSize={metaspace} -Dfile.encoding=UTF-8",
+        "org.gradle.parallel": "true",
         "org.gradle.daemon": "false",
-        "org.gradle.workers.max": "1",
-        "kotlin.daemon.jvmargs": "-Xmx384m",
+        "org.gradle.workers.max": "2",
+        "kotlin.daemon.jvmargs": f"-Xmx{metaspace}",
         "org.gradle.java.installations.auto-download": "false",
         "org.gradle.java.installations.auto-detect": "true",
     }
