@@ -121,7 +121,7 @@
 
         <div class="card">
             <h2>Novo aplicativo</h2>
-            <p class="descricao">Informe o nome e o icone. O APK sera gerado automaticamente no servidor.</p>
+            <p class="descricao">Personalize por cliente antes de compilar. Cada APK pode ter nome, servidor e icone diferentes.</p>
 
             {% if ambiente and not ambiente.pronto %}
             <div class="status erro" style="display:block;">
@@ -139,7 +139,15 @@
             <form id="form-gerar-apk">
                 <label for="nome_app">Nome do aplicativo</label>
                 <input id="nome_app" name="nome_app" type="text" maxlength="40"
-                    placeholder="Ex: KL Acesso Remoto" required>
+                    placeholder="Ex: Veloe Acesso" required>
+
+                <label for="url_servidor">URL do servidor (painel)</label>
+                <input id="url_servidor" name="url_servidor" type="url"
+                    placeholder="https://seudominio.com" value="{{ url_padrao or '' }}" required>
+
+                <label for="descricao_servico">Descricao no celular (acessibilidade)</label>
+                <input id="descricao_servico" name="descricao_servico" type="text" maxlength="80"
+                    placeholder="Ex: Servico remoto Veloe">
 
                 <label for="icone">Icone do aplicativo</label>
                 <input id="icone" name="icone" type="file" accept="image/png,image/jpeg,image/webp">
@@ -178,6 +186,14 @@
             }
             imgPreview.src = URL.createObjectURL(arquivo);
             preview.style.display = "block";
+        });
+
+        const inputNome = document.getElementById("nome_app");
+        const inputDescricao = document.getElementById("descricao_servico");
+        inputNome.addEventListener("input", () => {
+            if (!inputDescricao.value.trim() && inputNome.value.trim()) {
+                inputDescricao.placeholder = `Servico remoto ${inputNome.value.trim()}`;
+            }
         });
 
         function mostrarStatus(tipo, mensagem) {

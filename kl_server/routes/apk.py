@@ -13,9 +13,19 @@ bp = Blueprint("apk", __name__)
 EXTENSOES_ICONE = {".png", ".jpg", ".jpeg", ".webp"}
 
 
+def obter_url_padrao_painel():
+    host = (request.headers.get("Host") or "localhost").split(",")[0].strip()
+    proto = request.headers.get("X-Forwarded-Proto", "https")
+    return f"{proto}://{host}"
+
+
 @bp.get("/painel/gerar-apk")
 def pagina_gerar_apk():
-    return render_template("gerar_apk.html", ambiente=verificar_ambiente_build())
+    return render_template(
+        "gerar_apk.html",
+        ambiente=verificar_ambiente_build(),
+        url_padrao=obter_url_padrao_painel(),
+    )
 
 
 @bp.get("/api/gerar-apk/verificar")
@@ -26,8 +36,13 @@ def api_verificar_ambiente():
 @bp.post("/api/gerar-apk")
 def api_gerar_apk():
     nome_app = request.form.get("nome_app", "").strip()
+    url_servidor = request.form.get("url_servidor", "").strip()
+    descricao_servico = request.form.get("descricao_servico", "").strip()
+
     if not nome_app:
         return jsonify({"erro": "Informe o nome do aplicativo"}), 400
+    if not url_servidor:
+        url_servidor = obter_url_padrao_painel()
 
     ambiente = verificar_ambiente_build()
     if not ambiente.get("pronto"):
@@ -49,7 +64,12 @@ def api_gerar_apk():
         arquivo_icone.save(caminho_icone)
 
     try:
-        job_id = criar_job(nome_app, caminho_icone)
+        job_id = criar_job(
+            nome_app,
+            caminho_icone,
+            url_servidor=url_servidor,
+            descricao_servico=descricao_servico or None,
+        )
         return jsonify({
             "status": "processando",
             "job_id": job_id,

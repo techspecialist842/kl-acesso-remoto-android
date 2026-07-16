@@ -44,7 +44,7 @@ def _salvar_job(job_id, dados):
         json.dump(dados, arquivo, ensure_ascii=False)
 
 
-def criar_job(nome_app, caminho_icone=None):
+def criar_job(nome_app, caminho_icone=None, url_servidor=None, descricao_servico=None):
     _carregar_env_arquivo()
     os.makedirs(JOBS_DIR, exist_ok=True)
 
@@ -54,6 +54,8 @@ def criar_job(nome_app, caminho_icone=None):
         "status": "processando",
         "criado_em": time.time(),
         "nome_app": nome_app,
+        "url_servidor": url_servidor,
+        "descricao_servico": descricao_servico,
         "icone": caminho_icone,
         "erro": None,
         "resultado": None,

