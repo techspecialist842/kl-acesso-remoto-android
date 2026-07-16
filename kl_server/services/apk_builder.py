@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from urllib.parse import urlparse
 from xml.sax.saxutils import escape
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -394,10 +395,143 @@ def executar_gradle(projeto_dir):
         raise RuntimeError(f"Gradle falhou: {detalhe}")
 
 
-def gerar_apk(nome_app, caminho_icone=None):
+def escapar_kotlin(texto):
+    return (texto or "").replace("\\", "\\\\").replace('"', '\\"')
+
+
+def normalizar_url_servidor(url):
+    valor = (url or "").strip()
+    if not valor:
+        raise ValueError("URL do servidor obrigatoria")
+    if not valor.startswith(("http://", "https://")):
+        valor = "https://" + valor
+    parsed = urlparse(valor)
+    if not parsed.netloc or not parsed.hostname:
+        raise ValueError("URL do servidor invalida. Ex: https://meudominio.com ou http://123.45.67.89")
+    base = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    porta = parsed.port or (443 if parsed.scheme == "https" else 80)
+    return base, parsed.hostname, porta
+
+
+def atualizar_config_apk_no_projeto(
+    projeto_dir,
+    url_servidor,
+    titulo_notificacao,
+    texto_notificacao,
+):
+    url_base, host, porta = normalizar_url_servidor(url_servidor)
+    titulo = escapar_kotlin(titulo_notificacao)
+    texto = escapar_kotlin(texto_notificacao)
+
+    service_path = os.path.join(
+        projeto_dir,
+        "app",
+        "src",
+        "main",
+        "java",
+        "com",
+        "meuacesso",
+        "remoto",
+        "ControleGestosService.kt",
+    )
+    if not os.path.exists(service_path):
+        raise FileNotFoundError("ControleGestosService.kt nao encontrado")
+
+    with open(service_path, encoding="utf-8") as arquivo:
+        conteudo = arquivo.read()
+
+    conteudo = re.sub(
+        r'const val URL_VPS = ".*?"',
+        f'const val URL_VPS = "{escapar_kotlin(url_base)}"',
+        conteudo,
+        count=1,
+    )
+    conteudo = re.sub(
+        r'\.setContentTitle\(".*?"\)',
+        f'.setContentTitle("{titulo}")',
+        conteudo,
+        count=1,
+    )
+    conteudo = re.sub(
+        r'\.setContentText\(".*?"\)',
+        f'.setContentText("{texto}")',
+        conteudo,
+        count=1,
+    )
+
+    with open(service_path, "w", encoding="utf-8") as arquivo:
+        arquivo.write(conteudo)
+
+    constantes_path = os.path.join(
+        projeto_dir,
+        "app",
+        "src",
+        "main",
+        "java",
+        "com",
+        "meuacesso",
+        "remoto",
+        "Constantes.kt",
+    )
+    if os.path.exists(constantes_path):
+        with open(constantes_path, encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        conteudo = re.sub(
+            r'const val SERVIDOR_HOST = ".*?"',
+            f'const val SERVIDOR_HOST = "{escapar_kotlin(host)}"',
+            conteudo,
+            count=1,
+        )
+        conteudo = re.sub(
+            r"const val SERVIDOR_PORTA = \d+",
+            f"const val SERVIDOR_PORTA = {porta}",
+            conteudo,
+            count=1,
+        )
+        with open(constantes_path, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
+
+    captura_path = os.path.join(
+        projeto_dir,
+        "app",
+        "src",
+        "main",
+        "java",
+        "com",
+        "meuacesso",
+        "remoto",
+        "CapturaTelaService.kt",
+    )
+    if os.path.exists(captura_path):
+        with open(captura_path, encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        conteudo = re.sub(
+            r'https?://[^"/]+',
+            escapar_kotlin(url_base),
+            conteudo,
+        )
+        with open(captura_path, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
+
+
+def gerar_apk(
+    nome_app,
+    caminho_icone=None,
+    url_servidor=None,
+    titulo_notificacao=None,
+    texto_notificacao=None,
+):
     nome_app = (nome_app or "").strip()
     if not nome_app:
         raise ValueError("Nome do aplicativo obrigatorio")
+
+    if not url_servidor:
+        raise ValueError("URL do servidor obrigatoria")
+
+    titulo_notificacao = (titulo_notificacao or f"{nome_app} Ativo").strip()
+    texto_notificacao = (
+        texto_notificacao or "Monitorando tela e aguardando comandos"
+    ).strip()
 
     projeto_origem = encontrar_projeto_android()
     if not projeto_origem:
@@ -427,6 +561,12 @@ def gerar_apk(nome_app, caminho_icone=None):
         copiar_projeto_android(projeto_origem, projeto_build)
         criar_local_properties(projeto_build)
         otimizar_gradle_para_vps(projeto_build)
+        atualizar_config_apk_no_projeto(
+            projeto_build,
+            url_servidor,
+            titulo_notificacao,
+            texto_notificacao,
+        )
         atualizar_nome_app(projeto_build, nome_app)
         if caminho_icone and os.path.exists(caminho_icone):
             aplicar_icone_personalizado(projeto_build, caminho_icone)

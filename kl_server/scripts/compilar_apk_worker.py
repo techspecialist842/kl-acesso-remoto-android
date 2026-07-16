@@ -51,7 +51,13 @@ def main():
     from services.apk_builder import gerar_apk
 
     try:
-        resultado = gerar_apk(job.get("nome_app", ""), job.get("icone"))
+        resultado = gerar_apk(
+            job.get("nome_app", ""),
+            job.get("icone"),
+            job.get("url_servidor"),
+            job.get("titulo_notificacao"),
+            job.get("texto_notificacao"),
+        )
         job["status"] = "ok"
         job["resultado"] = resultado
         job["erro"] = None

