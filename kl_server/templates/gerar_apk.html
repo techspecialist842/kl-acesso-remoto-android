@@ -3,178 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerar APK - KL Painel</title>
+    <title>Gerar APK - KL Acesso Remoto</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --fundo: #0F1117;
+            --card: #161B26;
+            --borda: #272E3B;
+            --texto: #F8FAFC;
+            --texto-suave: #94A3B8;
+            --azul: #60A5FA;
+        }
+        * { box-sizing: border-box; }
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            padding: 30px;
-            color: #222;
-        }
-
-        .card {
-            background: #fff;
-            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            background: var(--fundo);
+            color: var(--texto);
             padding: 24px;
-            max-width: 640px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
         }
-
-        h1 {
-            margin-bottom: 8px;
-        }
-
-        p {
-            color: #555;
+        .wrap { max-width: 640px; margin: 0 auto; }
+        .topbar {
             margin-bottom: 20px;
         }
-
+        .marca {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--azul);
+        }
+        .subtitulo {
+            color: var(--texto-suave);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--borda);
+            border-radius: 12px;
+            padding: 24px;
+        }
+        h2 {
+            font-size: 20px;
+            margin-bottom: 6px;
+        }
+        .descricao {
+            color: var(--texto-suave);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
         label {
             display: block;
             font-weight: 600;
             margin: 16px 0 8px;
+            font-size: 14px;
         }
-
         input[type="text"],
         input[type="file"] {
             width: 100%;
             padding: 12px;
-            border: 1px solid #ccd4dc;
+            border: 1px solid var(--borda);
             border-radius: 8px;
-            box-sizing: border-box;
+            background: #0F1117;
+            color: var(--texto);
         }
-
-        .preview {
-            margin-top: 12px;
-            display: none;
-        }
-
+        .preview { margin-top: 12px; display: none; }
         .preview img {
             width: 96px;
             height: 96px;
             border-radius: 18px;
             object-fit: cover;
-            border: 1px solid #ddd;
+            border: 1px solid var(--borda);
         }
-
-        button,
-        .botao {
+        button, .botao {
             display: inline-block;
             margin-top: 20px;
             padding: 12px 18px;
             border: none;
             border-radius: 8px;
-            background: #222;
+            background: linear-gradient(135deg, #3B82F6, #6366F1);
             color: #fff;
             text-decoration: none;
             cursor: pointer;
             font-size: 15px;
+            font-weight: 600;
         }
-
-        button:disabled {
-            opacity: 0.6;
-            cursor: wait;
-        }
-
-        .links {
-            margin-top: 20px;
-        }
-
+        button:disabled { opacity: 0.5; cursor: wait; }
+        .links { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .botao-secundario { background: #272E3B; }
         .status {
             margin-top: 18px;
             padding: 12px;
             border-radius: 8px;
             display: none;
+            font-size: 14px;
         }
-
-        .status.ok {
-            display: block;
-            background: #e8f8ee;
-            color: #166534;
-        }
-
-        .status.erro {
-            display: block;
-            background: #fdecec;
-            color: #991b1b;
-        }
-
-        .instrucoes-setup {
+        .status.ok { display: block; background: #14532d33; color: #86efac; border: 1px solid #166534; }
+        .status.erro { display: block; background: #7f1d1d33; color: #fca5a5; border: 1px solid #991b1b; }
+        .status.info { display: block; background: #1e3a8a33; color: #93c5fd; border: 1px solid #1d4ed8; }
+        .aviso-admin {
             margin-top: 12px;
             padding: 14px;
-            background: #fffbeb;
-            border: 1px solid #fcd34d;
+            background: #42200633;
+            border: 1px solid #92400e;
             border-radius: 8px;
+            color: #fcd34d;
             font-size: 14px;
-            color: #92400e;
-            line-height: 1.5;
-        }
-
-        .instrucoes-setup code {
-            display: block;
-            margin-top: 8px;
-            padding: 10px;
-            background: #1f2937;
-            color: #f9fafb;
-            border-radius: 6px;
-            white-space: pre-wrap;
-            font-size: 13px;
-        }
-
-        .status.info {
-            display: block;
-            background: #eef4ff;
-            color: #1d4ed8;
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Gerar novo aplicativo</h1>
-        <p>Crie um APK personalizado sem abrir o Android Studio.</p>
-
-        {% if ambiente and not ambiente.pronto %}
-        <div class="status erro" style="display:block;">
-            Servidor incompleto para gerar APK.
-            Java: {{ "OK" if ambiente.java else "FALTA" }} |
-            SDK: {{ "OK" if ambiente.android_sdk else "FALTA" }} |
-            Projeto: {{ "OK" if ambiente.projeto_android else "FALTA" }} |
-            Pillow: {{ "OK" if ambiente.pillow else "FALTA" }}
+    <div class="wrap">
+        <div class="topbar">
+            <div class="marca">KL Acesso Remoto</div>
+            <p class="subtitulo">Gerador de aplicativo personalizado</p>
         </div>
-        <div class="instrucoes-setup">
-            <strong>Configuracao necessaria no VPS (uma vez):</strong>
-            Se <code>/root/kl_server</code> nao tem git, use estes comandos:
-            <code>cd /root/kl_server
-mkdir -p scripts
-wget -O scripts/atualizar_arquivos_vps.sh https://raw.githubusercontent.com/techspecialist842/kl-acesso-remoto-android/main/kl_server/scripts/atualizar_arquivos_vps.sh
-bash scripts/atualizar_arquivos_vps.sh
-bash scripts/setup_apk_builder.sh
-pkill -f gunicorn || true
-source venv/bin/activate
-gunicorn -c gunicorn.conf.py app:app</code>
-            O arquivo <strong>gunicorn.conf.py</strong> fica em <code>/root/kl_server/gunicorn.conf.py</code> (mesma pasta do app.py).
-        </div>
-        {% endif %}
 
-        <form id="form-gerar-apk">
-            <label for="nome_app">Nome do aplicativo</label>
-            <input id="nome_app" name="nome_app" type="text" maxlength="40"
-                placeholder="Ex: KL Acesso Remoto" required>
+        <div class="card">
+            <h2>Novo aplicativo</h2>
+            <p class="descricao">Informe o nome e o icone. O APK sera gerado automaticamente no servidor.</p>
 
-            <label for="icone">Icone do aplicativo</label>
-            <input id="icone" name="icone" type="file" accept="image/png,image/jpeg,image/webp">
-            <div class="preview" id="preview-icone">
-                <img id="img-preview" alt="Preview do icone">
+            {% if ambiente and not ambiente.pronto %}
+            <div class="status erro" style="display:block;">
+                Compilador indisponivel no momento. Solicite a configuracao ao administrador.
             </div>
+            <div class="aviso-admin">
+                Status interno:
+                Java {{ "OK" if ambiente.java else "pendente" }} |
+                SDK {{ "OK" if ambiente.android_sdk else "pendente" }} |
+                Projeto {{ "OK" if ambiente.projeto_android else "pendente" }} |
+                Pillow {{ "OK" if ambiente.pillow else "pendente" }}
+            </div>
+            {% endif %}
 
-            <button type="submit" id="btn-gerar" {% if ambiente and not ambiente.pronto %}disabled title="Configure o servidor primeiro"{% endif %}>Gerar novo aplicativo</button>
-        </form>
+            <form id="form-gerar-apk">
+                <label for="nome_app">Nome do aplicativo</label>
+                <input id="nome_app" name="nome_app" type="text" maxlength="40"
+                    placeholder="Ex: KL Acesso Remoto" required>
 
-        <div class="status" id="status"></div>
+                <label for="icone">Icone do aplicativo</label>
+                <input id="icone" name="icone" type="file" accept="image/png,image/jpeg,image/webp">
+                <div class="preview" id="preview-icone">
+                    <img id="img-preview" alt="Preview do icone">
+                </div>
 
-        <div class="links">
-            <a class="botao" href="/painel">Voltar ao painel</a>
-            <a class="botao" id="link-download" href="#" style="display:none;">Baixar APK</a>
+                <button type="submit" id="btn-gerar" {% if ambiente and not ambiente.pronto %}disabled{% endif %}>
+                    Gerar aplicativo
+                </button>
+            </form>
+
+            <div class="status" id="status"></div>
+
+            <div class="links">
+                <a class="botao botao-secundario" href="/painel">Voltar ao painel</a>
+                <a class="botao" id="link-download" href="#" style="display:none;">Baixar APK</a>
+            </div>
         </div>
     </div>
 
@@ -208,7 +191,7 @@ gunicorn -c gunicorn.conf.py app:app</code>
                 try {
                     const resposta = await fetch(url, opcoes);
                     if ([502, 503, 504].includes(resposta.status) && i < tentativasMax) {
-                        mostrarStatus("info", `Servidor ocupado (${resposta.status}). Tentando de novo... ${i}/${tentativasMax}`);
+                        mostrarStatus("info", `Servidor compilando... aguarde (${i}/${tentativasMax})`);
                         await new Promise((resolve) => setTimeout(resolve, 4000));
                         continue;
                     }
@@ -216,13 +199,13 @@ gunicorn -c gunicorn.conf.py app:app</code>
                 } catch (erro) {
                     ultimoErro = erro;
                     if (i < tentativasMax) {
-                        mostrarStatus("info", `Conexao instavel. Tentando de novo... ${i}/${tentativasMax}`);
+                        mostrarStatus("info", `Reconectando... (${i}/${tentativasMax})`);
                         await new Promise((resolve) => setTimeout(resolve, 4000));
                         continue;
                     }
                 }
             }
-            throw ultimoErro || new Error("Falha de conexao com o servidor");
+            throw ultimoErro || new Error("Nao foi possivel conectar ao servidor.");
         }
 
         async function lerRespostaJson(resposta) {
@@ -231,12 +214,9 @@ gunicorn -c gunicorn.conf.py app:app</code>
                 return JSON.parse(texto);
             } catch (_erro) {
                 if (texto.trim().startsWith("<")) {
-                    throw new Error(
-                        `Erro HTTP ${resposta.status}: nginx sem timeout para APK. ` +
-                        "No VPS rode: bash scripts/corrigir_nginx_apk.sh && systemctl reload nginx"
-                    );
+                    throw new Error("Servidor ocupado. Aguarde 1 minuto e tente novamente.");
                 }
-                throw new Error(texto.slice(0, 200) || "Resposta invalida do servidor");
+                throw new Error("Resposta invalida do servidor.");
             }
         }
 
@@ -254,28 +234,26 @@ gunicorn -c gunicorn.conf.py app:app</code>
                 if (json.status === "processando") {
                     const minutos = Math.floor((tentativas * 3) / 60);
                     const segundos = (tentativas * 3) % 60;
-                    mostrarStatus(
-                        "info",
-                        `Compilando APK... ${minutos}m ${segundos}s (primeira vez pode levar 10+ min)`
-                    );
+                    mostrarStatus("info", `Compilando aplicativo... ${minutos}m ${segundos}s`);
                     continue;
                 }
 
                 if (json.status === "erro" || !resposta.ok) {
-                    throw new Error(json.erro || "Falha ao gerar APK");
+                    const msg = (json.erro || "Falha ao gerar aplicativo").slice(0, 300);
+                    throw new Error(msg);
                 }
 
                 return json;
             }
 
-            throw new Error("Tempo limite excedido. Verifique os logs do servidor.");
+            throw new Error("Tempo limite excedido. Tente novamente em alguns minutos.");
         }
 
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
             linkDownload.style.display = "none";
             btnGerar.disabled = true;
-            mostrarStatus("info", "Iniciando compilacao do APK...");
+            mostrarStatus("info", "Iniciando geracao do aplicativo...");
 
             const dados = new FormData(form);
 
@@ -287,19 +265,16 @@ gunicorn -c gunicorn.conf.py app:app</code>
                 const json = await lerRespostaJson(resposta);
 
                 if (!resposta.ok) {
-                    throw new Error(json.erro || "Falha ao iniciar geracao do APK");
+                    throw new Error(json.erro || "Nao foi possivel iniciar a geracao.");
                 }
 
                 if (!json.job_id) {
-                    throw new Error("Servidor nao retornou job_id. Atualize os arquivos do VPS.");
+                    throw new Error("Servidor desatualizado. Solicite atualizacao ao administrador.");
                 }
 
                 const resultado = await aguardarJob(json.job_id);
                 const tamanhoMb = (resultado.tamanho_bytes / (1024 * 1024)).toFixed(2);
-                mostrarStatus(
-                    "ok",
-                    `APK "${resultado.nome_app}" gerado com sucesso (${tamanhoMb} MB).`
-                );
+                mostrarStatus("ok", `Aplicativo "${resultado.nome_app}" pronto (${tamanhoMb} MB).`);
                 linkDownload.href = resultado.download_url;
                 linkDownload.style.display = "inline-block";
                 linkDownload.textContent = "Baixar APK";

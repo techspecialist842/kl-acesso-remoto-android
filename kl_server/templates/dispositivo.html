@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Espelho KL</title>
+    <title>KL Acesso Remoto</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -685,10 +685,11 @@
     <!-- BARRA SUPERIOR PROFISSIONAL -->
     <div class="topbar">
         <div class="topbar-esquerda">
-            <h1>Espelho KL</h1>
+            <h1>KL Acesso Remoto</h1>
             <p>{{ dispositivo.modelo }} • Android {{ dispositivo.android }} • {{ dispositivo.largura }} × {{ dispositivo.altura }}</p>
         </div>
         <div class="topbar-direita">
+            <a href="/painel" style="color:var(--azul-claro);text-decoration:none;font-size:14px;">← Painel</a>
             <span class="status-online">🟢 online</span>
             <span id="status-tela" class="status-online" style="display:none">📱 tela ligada</span>
             <span class="info-atualizacao">Atualização: <span id="ultima-atualizacao">--</span></span>
@@ -780,7 +781,7 @@
         <!-- COLUNA CENTRAL: ESPELHO -->
         <div class="coluna-central">
             <div class="card">
-                <h2>Espelho da Tela</h2>
+                <h2>Espelho do dispositivo</h2>
                 <div class="area-espelho">
                     <div class="espelho-viewport">
                         <div id="celular" class="celular" 

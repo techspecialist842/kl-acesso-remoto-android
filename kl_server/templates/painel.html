@@ -1,102 +1,118 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-    <title>KL Painel</title>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KL Acesso Remoto</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --fundo: #0F1117;
+            --card: #161B26;
+            --borda: #272E3B;
+            --texto: #F8FAFC;
+            --texto-suave: #94A3B8;
+            --azul: #60A5FA;
+            --verde: #22C55E;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            padding: 30px;
+            font-family: 'Inter', sans-serif;
+            background: var(--fundo);
+            color: var(--texto);
+            padding: 24px;
         }
-
-        h1 {
-            color: #222;
-        }
-
-        .card {
-            background: white;
-            padding: 20px;
+        .topbar {
+            background: var(--card);
+            border: 1px solid var(--borda);
             border-radius: 12px;
-            margin-top: 20px;
-            box-shadow: 0 2px 10px #0002;
+            padding: 20px 24px;
+            margin-bottom: 24px;
         }
-
-        .online {
-            color: green;
-            font-weight: bold;
+        .marca {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--azul);
+            letter-spacing: -0.02em;
         }
-
+        .subtitulo {
+            color: var(--texto-suave);
+            margin-top: 4px;
+            font-size: 14px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--borda);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        .card p {
+            color: var(--texto-suave);
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+        .online { color: var(--verde); font-weight: 600; }
         .botao {
             display: inline-block;
-            margin-top: 15px;
-            padding: 10px 18px;
-            background: #222;
-            color: white;
+            margin-top: 14px;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #3B82F6, #6366F1);
+            color: #fff;
             text-decoration: none;
             border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .botao:hover { opacity: 0.92; }
+        .destaque {
+            border-color: #3B82F6;
+            background: linear-gradient(180deg, #161B26 0%, #1a2233 100%);
         }
     </style>
 </head>
-
 <body>
 
-<h1>KL Painel de Dispositivos</h1>
-
-<div class="card">
-    <h2>Gerar aplicativo</h2>
-    <p>Crie um APK personalizado com nome e icone sem abrir o Android Studio.</p>
-    <a class="botao" href="/painel/gerar-apk">Gerar novo APK</a>
-</div>
-
-{% if dispositivos %}
-
-    {% for dispositivo in dispositivos %}
-
-    <div class="card">
-
-        <h2>{{ dispositivo.modelo }}</h2>
-
-        <p>
-            Fabricante:
-            {{ dispositivo.fabricante }}
-        </p>
-
-        <p>
-            Android:
-            {{ dispositivo.android }}
-        </p>
-
-        <p>
-            Resolucao:
-            {{ dispositivo.largura }} x {{ dispositivo.altura }}
-        </p>
-
-        <p class="online">
-            Online
-        </p>
-
-        <p>
-            ID:
-            {{ dispositivo.id }}
-        </p>
-
-        <a class="botao" href="/painel/dispositivo/{{ dispositivo.id }}">
-            Abrir dispositivo
-        </a>
-
+    <div class="topbar">
+        <div class="marca">KL Acesso Remoto</div>
+        <p class="subtitulo">Painel de controle remoto</p>
     </div>
 
-    {% endfor %}
+    <div class="grid">
+        <div class="card destaque">
+            <h2>Gerar aplicativo</h2>
+            <p>Crie um APK personalizado com nome e icone.</p>
+            <a class="botao" href="/painel/gerar-apk">Gerar novo APK</a>
+        </div>
 
-{% else %}
-
-<div class="card">
-    Nenhum dispositivo conectado.
-</div>
-
-{% endif %}
+        {% if dispositivos %}
+            {% for dispositivo in dispositivos %}
+            <div class="card">
+                <h2>{{ dispositivo.modelo }}</h2>
+                <p>Fabricante: {{ dispositivo.fabricante }}</p>
+                <p>Android: {{ dispositivo.android }}</p>
+                <p>Resolucao: {{ dispositivo.largura }} x {{ dispositivo.altura }}</p>
+                <p class="online">Online</p>
+                <a class="botao" href="/painel/dispositivo/{{ dispositivo.id }}">Abrir dispositivo</a>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="card">
+            <h2>Nenhum dispositivo</h2>
+            <p>Aguardando celular conectar ao servidor.</p>
+        </div>
+        {% endif %}
+    </div>
 
 </body>
 </html>

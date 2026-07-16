@@ -21,7 +21,7 @@ app.register_blueprint(apk_bp)
 
 @app.get("/")
 def inicio():
-    return "KL SERVER ONLINE"
+    return "KL Acesso Remoto - servidor online"
 
 
 if __name__ == "__main__":
