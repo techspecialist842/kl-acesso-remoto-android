@@ -5,7 +5,7 @@ set -euo pipefail
 # Uso: bash scripts/corrigir_memoria_vps.sh
 
 SWAP_FILE="${SWAP_FILE:-/swapfile}"
-SWAP_MB="${SWAP_MB:-2048}"
+SWAP_MB="${SWAP_MB:-4096}"
 
 if swapon --show | grep -q "$SWAP_FILE"; then
   echo "OK: swap ja ativo em $SWAP_FILE"

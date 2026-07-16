@@ -224,8 +224,41 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
                 )
 
 
+def encontrar_java_home():
+    candidatos = [
+        os.environ.get("JAVA_HOME"),
+        "/usr/lib/jvm/java-17-openjdk-amd64",
+        "/usr/lib/jvm/java-17-openjdk",
+        "/usr/lib/jvm/java-17-openjdk-arm64",
+    ]
+    for caminho in candidatos:
+        if caminho and os.path.isdir(caminho) and os.path.isfile(
+            os.path.join(caminho, "bin", "java")
+        ):
+            return caminho
+
+    if os.name != "nt":
+        try:
+            resultado = subprocess.run(
+                ["bash", "-lc", "dirname $(dirname $(readlink -f $(which java)))"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            caminho = resultado.stdout.strip()
+            if resultado.returncode == 0 and caminho and os.path.isdir(caminho):
+                return caminho
+        except Exception:
+            pass
+    return None
+
+
 def otimizar_gradle_para_vps(projeto_dir):
     """Reduz uso de RAM no VPS para evitar OOM killer durante assembleDebug."""
+    daemon_jvm = os.path.join(projeto_dir, "gradle", "gradle-daemon-jvm.properties")
+    if os.path.exists(daemon_jvm):
+        os.remove(daemon_jvm)
+
     caminho = os.path.join(projeto_dir, "gradle.properties")
     linhas = []
     if os.path.exists(caminho):
@@ -233,11 +266,13 @@ def otimizar_gradle_para_vps(projeto_dir):
             linhas = arquivo.read().splitlines()
 
     substituicoes = {
-        "org.gradle.jvmargs": "-Xmx768m -XX:MaxMetaspaceSize=256m -Dfile.encoding=UTF-8",
+        "org.gradle.jvmargs": "-Xmx512m -XX:MaxMetaspaceSize=192m -Dfile.encoding=UTF-8",
         "org.gradle.parallel": "false",
         "org.gradle.daemon": "false",
         "org.gradle.workers.max": "1",
-        "kotlin.daemon.jvmargs": "-Xmx512m",
+        "kotlin.daemon.jvmargs": "-Xmx384m",
+        "org.gradle.java.installations.auto-download": "false",
+        "org.gradle.java.installations.auto-detect": "true",
     }
 
     chaves_vistas = set()
@@ -260,7 +295,7 @@ def otimizar_gradle_para_vps(projeto_dir):
 
 def preparar_env_gradle(env=None):
     env = dict(env or os.environ)
-    java_home = env.get("JAVA_HOME")
+    java_home = env.get("JAVA_HOME") or encontrar_java_home()
     bases = ["/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin"]
     if java_home:
         bases.insert(0, os.path.join(java_home, "bin"))
@@ -270,12 +305,16 @@ def preparar_env_gradle(env=None):
         bases.insert(0, os.path.join(sdk, "platform-tools"))
     atual = env.get("PATH", "")
     env["PATH"] = os.pathsep.join(bases + ([atual] if atual else []))
-    env["GRADLE_OPTS"] = "-Xmx768m -XX:MaxMetaspaceSize=256m -Dfile.encoding=UTF-8"
-    env["JAVA_TOOL_OPTIONS"] = "-Xmx768m"
+    env["GRADLE_OPTS"] = "-Dorg.gradle.daemon=false -Xmx512m -XX:MaxMetaspaceSize=192m"
+    env["JAVA_TOOL_OPTIONS"] = "-Xmx512m"
     env["GRADLE_USER_HOME"] = env.get("GRADLE_USER_HOME") or "/root/.gradle"
     if java_home:
         env["JAVA_HOME"] = java_home
         env["ORG_GRADLE_JAVA_HOME"] = java_home
+    else:
+        raise RuntimeError(
+            "JAVA_HOME nao encontrado. Instale JDK 17: apt install openjdk-17-jdk"
+        )
     return env
 
 
@@ -288,7 +327,22 @@ def executar_gradle(projeto_dir):
         gradlew = os.path.join(projeto_dir, "gradlew")
         if not os.access(gradlew, os.X_OK):
             os.chmod(gradlew, 0o755)
-        comando = [gradlew, "assembleDebug", "--no-daemon", "--max-workers=1"]
+        subprocess.run(
+            [gradlew, "--stop"],
+            cwd=projeto_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+        )
+        comando = [
+            gradlew,
+            "assembleDebug",
+            "--no-daemon",
+            "--max-workers=1",
+            "-Dorg.gradle.java.home=" + env["JAVA_HOME"],
+            "-Dorg.gradle.daemon=false",
+        ]
 
     resultado = subprocess.run(
         comando,

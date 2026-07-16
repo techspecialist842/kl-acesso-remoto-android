@@ -26,9 +26,11 @@ echo "OK: uname=$(command -v uname) xargs=$(command -v xargs)"
 
 REPO_DIR="${REPO_DIR:-/root/kl-acesso-remoto-android}"
 if [ -f "$REPO_DIR/gradlew" ]; then
-  echo "==> Parando daemons Gradle antigos..."
+  echo "==> Parando daemons Gradle e removendo JDK 21 auto-baixado..."
   cd "$REPO_DIR"
   ./gradlew --stop >/dev/null 2>&1 || true
+  rm -f "$REPO_DIR/gradle/gradle-daemon-jvm.properties"
+  rm -rf /root/.gradle/daemon /root/.gradle/jdks 2>/dev/null || true
 fi
 
 echo "Reinicie o gunicorn e tente gerar o APK novamente."
