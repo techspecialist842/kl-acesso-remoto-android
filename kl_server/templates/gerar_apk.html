@@ -170,12 +170,14 @@ gunicorn -c gunicorn.conf.py app:app</code>
                 placeholder="https://meudominio.com ou http://123.45.67.89" required>
             <div class="dica">Use o endereco deste painel. Pode ser dominio ou IP com http/https.</div>
 
-            <label for="nome_app">Nome do aplicativo</label>
+            <label for="nome_app">Nome do aplicativo (aparece no celular)</label>
             <input id="nome_app" name="nome_app" type="text" maxlength="40"
+                value="{{ branding.nome_padrao_apk }}"
                 placeholder="Ex: {{ branding.nome_padrao_apk }}" required>
 
             <label for="titulo_notificacao">Titulo da notificacao no celular</label>
             <input id="titulo_notificacao" name="titulo_notificacao" type="text" maxlength="60"
+                value="{{ branding.nome_padrao_apk }} Ativo"
                 placeholder="Ex: {{ branding.nome_padrao_apk }} Ativo">
 
             <label for="texto_notificacao">Texto da notificacao no celular</label>

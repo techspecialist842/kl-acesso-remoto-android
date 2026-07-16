@@ -150,6 +150,13 @@ def copiar_projeto_android(origem, destino):
 
 
 def atualizar_nome_app(projeto_dir, nome_app):
+    nome_app = nome_app.strip()
+    if not nome_app:
+        raise ValueError("Nome do aplicativo obrigatorio")
+
+    nome_xml = escape(nome_app)
+    nome_kotlin = escapar_kotlin(nome_app)
+
     strings_path = os.path.join(
         projeto_dir,
         "app",
@@ -165,16 +172,86 @@ def atualizar_nome_app(projeto_dir, nome_app):
     with open(strings_path, "r", encoding="utf-8") as arquivo:
         conteudo = arquivo.read()
 
-    nome_seguro = escape(nome_app.strip())
     conteudo = re.sub(
-        r"<string name=\"app_name\">.*?</string>",
-        f'<string name="app_name">{nome_seguro}</string>',
+        r'<string name="app_name">.*?</string>',
+        f'<string name="app_name">{nome_xml}</string>',
         conteudo,
         count=1,
     )
-
     with open(strings_path, "w", encoding="utf-8") as arquivo:
         arquivo.write(conteudo)
+
+    manifest_path = os.path.join(
+        projeto_dir, "app", "src", "main", "AndroidManifest.xml"
+    )
+    if os.path.exists(manifest_path):
+        with open(manifest_path, encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        conteudo = re.sub(
+            r'(<application[^>]*android:label=")[^"]*(")',
+            rf'\1{nome_xml}\2',
+            conteudo,
+            count=1,
+        )
+        with open(manifest_path, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
+
+    layout_path = os.path.join(
+        projeto_dir, "app", "src", "main", "res", "layout", "activity_main.xml"
+    )
+    if os.path.exists(layout_path):
+        with open(layout_path, encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        conteudo = re.sub(
+            r'android:text="[^"]*"',
+            f'android:text="{nome_xml}"',
+            conteudo,
+            count=1,
+        )
+        with open(layout_path, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
+
+    main_activity = os.path.join(
+        projeto_dir,
+        "app",
+        "src",
+        "main",
+        "java",
+        "com",
+        "meuacesso",
+        "remoto",
+        "MainActivity.kt",
+    )
+    if os.path.exists(main_activity):
+        with open(main_activity, encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        for antigo in ("KL Acesso Remoto", "Acesso Remoto"):
+            conteudo = conteudo.replace(antigo, nome_app)
+        with open(main_activity, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
+
+    service_path = os.path.join(
+        projeto_dir,
+        "app",
+        "src",
+        "main",
+        "java",
+        "com",
+        "meuacesso",
+        "remoto",
+        "ControleGestosService.kt",
+    )
+    if os.path.exists(service_path):
+        with open(service_path, encoding="utf-8") as arquivo:
+            conteudo = arquivo.read()
+        conteudo = re.sub(
+            r'("Controle Remoto")',
+            f'"{nome_kotlin}"',
+            conteudo,
+            count=1,
+        )
+        with open(service_path, "w", encoding="utf-8") as arquivo:
+            arquivo.write(conteudo)
 
 
 def limpar_recursos_icone_antigos(res_dir):

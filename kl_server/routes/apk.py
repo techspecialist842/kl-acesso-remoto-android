@@ -4,8 +4,9 @@ import uuid
 from flask import Blueprint, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, verificar_ambiente_build
+from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, gerar_apk, verificar_ambiente_build
 from services.apk_jobs import criar_job, obter_job
+from services.branding import obter_branding
 
 
 bp = Blueprint("apk", __name__)
@@ -22,6 +23,7 @@ def pagina_gerar_apk():
         "gerar_apk.html",
         ambiente=verificar_ambiente_build(),
         url_padrao_servidor=url_padrao,
+        branding=obter_branding(),
     )
 
 

@@ -35,6 +35,8 @@ def salvar_branding(dados):
         valor = dados.get(chave)
         if valor is not None:
             limpo[chave] = str(valor).strip()[:80] or PADROES[chave]
+    if dados.get("nome_marca") and not dados.get("nome_padrao_apk"):
+        limpo["nome_padrao_apk"] = limpo["nome_marca"]
     os.makedirs(os.path.dirname(BRANDING_PATH), exist_ok=True)
     with open(BRANDING_PATH, "w", encoding="utf-8") as arquivo:
         json.dump(limpo, arquivo, ensure_ascii=False, indent=2)
