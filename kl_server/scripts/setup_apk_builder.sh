@@ -21,7 +21,9 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y openjdk-17-jdk unzip wget git ca-certificates
+apt-get install -y \
+  openjdk-17-jdk unzip wget git ca-certificates \
+  coreutils findutils bash
 
 JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
 echo "    java:      $JAVA_HOME"
@@ -75,7 +77,7 @@ JAVA_HOME=$JAVA_HOME
 ANDROID_SDK_ROOT=$SDK_DIR
 ANDROID_HOME=$SDK_DIR
 ANDROID_PROJECT_PATH=$REPO_DIR
-PATH=$JAVA_HOME/bin:$SDK_DIR/cmdline-tools/latest/bin:$SDK_DIR/platform-tools:\$PATH
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$JAVA_HOME/bin:$SDK_DIR/cmdline-tools/latest/bin:$SDK_DIR/platform-tools:\$PATH
 EOF
 
 echo "==> Verificando ambiente..."

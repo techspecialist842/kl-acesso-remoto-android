@@ -224,11 +224,23 @@ def aplicar_icone_personalizado(projeto_dir, caminho_icone):
                 )
 
 
-def executar_gradle(projeto_dir):
-    env = os.environ.copy()
+def preparar_env_gradle(env=None):
+    env = dict(env or os.environ)
     java_home = env.get("JAVA_HOME")
+    bases = ["/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin"]
     if java_home:
-        env["PATH"] = os.path.join(java_home, "bin") + os.pathsep + env.get("PATH", "")
+        bases.insert(0, os.path.join(java_home, "bin"))
+    sdk = env.get("ANDROID_SDK_ROOT") or env.get("ANDROID_HOME")
+    if sdk:
+        bases.insert(0, os.path.join(sdk, "cmdline-tools", "latest", "bin"))
+        bases.insert(0, os.path.join(sdk, "platform-tools"))
+    atual = env.get("PATH", "")
+    env["PATH"] = os.pathsep.join(bases + ([atual] if atual else []))
+    return env
+
+
+def executar_gradle(projeto_dir):
+    env = preparar_env_gradle()
 
     if os.name == "nt":
         comando = [os.path.join(projeto_dir, "gradlew.bat"), "assembleDebug", "--no-daemon"]
