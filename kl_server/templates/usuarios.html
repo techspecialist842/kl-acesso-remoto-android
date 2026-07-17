@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios - {{ branding.nome_marca }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f8; padding: 24px; color: #222; }
+        .topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px #0001; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; }
+        th { background: #f8fafc; }
+        .badge { padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .ok { background: #dcfce7; color: #166534; }
+        .off { background: #fee2e2; color: #991b1b; }
+        .warn { background: #fef3c7; color: #92400e; }
+        input, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        label { display: block; font-weight: 600; margin: 10px 0 6px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        button, .botao {
+            padding: 10px 16px; border: none; border-radius: 8px; background: #222; color: #fff;
+            cursor: pointer; text-decoration: none; display: inline-block; margin-right: 8px; font-size: 14px;
+        }
+        .btn-azul { background: #1d4ed8; }
+        .btn-vermelho { background: #b91c1c; }
+        .status { margin-top: 12px; padding: 10px; border-radius: 8px; display: none; }
+        .status.ok { display: block; background: #e8f8ee; color: #166534; }
+        .status.erro { display: block; background: #fdecec; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="topo">
+        <div>
+            <h1>Gerenciar usuarios</h1>
+            <p style="color:#555;margin:0;">Cadastro, edicao, exclusao e planos de 7, 15 ou 30 dias</p>
+        </div>
+        <a class="botao" href="/painel">Voltar ao painel</a>
+    </div>
+
+    <div class="card">
+        <h2>Novo usuario</h2>
+        <form id="form-novo">
+            <div class="grid">
+                <div>
+                    <label>Usuario</label>
+                    <input name="usuario" required minlength="3">
+                </div>
+                <div>
+                    <label>Nome</label>
+                    <input name="nome" required>
+                </div>
+                <div>
+                    <label>Senha</label>
+                    <input name="senha" type="password" required minlength="4">
+                </div>
+                <div>
+                    <label>Plano</label>
+                    <select name="plano_dias">
+                        {% for dias in planos %}
+                        <option value="{{ dias }}">{{ dias }} dias</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-azul" style="margin-top:14px;">Cadastrar usuario</button>
+        </form>
+        <div class="status" id="status"></div>
+    </div>
+
+    <div class="card">
+        <h2>Usuarios cadastrados</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Nome</th>
+                    <th>Plano</th>
+                    <th>Expira</th>
+                    <th>Status</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody id="lista-usuarios">
+                {% for u in usuarios %}
+                <tr data-id="{{ u.id }}">
+                    <td>{{ u.usuario }}{% if u.is_admin %} (admin){% endif %}</td>
+                    <td>{{ u.nome }}</td>
+                    <td>{{ u.plano_dias }} dias</td>
+                    <td>{{ u.expira_em_fmt }}</td>
+                    <td>
+                        {% if u.expirado %}
+                        <span class="badge off">Expirado</span>
+                        {% elif not u.ativo %}
+                        <span class="badge off">Inativo</span>
+                        {% elif u.dias_restantes <= 3 %}
+                        <span class="badge warn">{{ u.dias_restantes }}d restantes</span>
+                        {% else %}
+                        <span class="badge ok">Ativo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not u.is_admin %}
+                        <button class="btn-renovar" data-id="{{ u.id }}" data-plano="{{ u.plano_dias }}">Renovar</button>
+                        <button class="btn-toggle" data-id="{{ u.id }}" data-ativo="{{ 1 if u.ativo else 0 }}">
+                            {{ "Desativar" if u.ativo else "Ativar" }}
+                        </button>
+                        <button class="btn-excluir btn-vermelho" data-id="{{ u.id }}">Excluir</button>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const status = document.getElementById("status");
+
+        function mostrar(tipo, msg) {
+            status.className = "status " + tipo;
+            status.textContent = msg;
+        }
+
+        document.getElementById("form-novo").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const dados = Object.fromEntries(new FormData(e.target).entries());
+            const res = await fetch("/api/usuarios", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(dados)
+            });
+            const json = await res.json();
+            if (!res.ok) return mostrar("erro", json.erro || "Erro ao cadastrar");
+            mostrar("ok", "Usuario cadastrado!");
+            setTimeout(() => location.reload(), 700);
+        });
+
+        document.querySelectorAll(".btn-renovar").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const id = btn.dataset.id;
+                const plano = parseInt(btn.dataset.plano, 10);
+                const res = await fetch(`/api/usuarios/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ plano_dias: plano, renovar: true, ativo: true })
+                });
+                const json = await res.json();
+                if (!res.ok) return mostrar("erro", json.erro || "Erro ao renovar");
+                location.reload();
+            });
+        });
+
+        document.querySelectorAll(".btn-toggle").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const id = btn.dataset.id;
+                const ativo = btn.dataset.ativo !== "1";
+                const res = await fetch(`/api/usuarios/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ativo })
+                });
+                const json = await res.json();
+                if (!res.ok) return mostrar("erro", json.erro || "Erro");
+                location.reload();
+            });
+        });
+
+        document.querySelectorAll(".btn-excluir").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                if (!confirm("Excluir este usuario?")) return;
+                const res = await fetch(`/api/usuarios/${btn.dataset.id}`, { method: "DELETE" });
+                const json = await res.json();
+                if (!res.ok) return mostrar("erro", json.erro || "Erro ao excluir");
+                location.reload();
+            });
+        });
+    </script>
+</body>
+</html>

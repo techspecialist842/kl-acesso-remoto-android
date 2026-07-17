@@ -7,3 +7,5 @@ apk_builder.env
 data/apks/
 data/apk_icons/
 data/apk_jobs/
+data/usuarios.db
+data/session_secret.txt

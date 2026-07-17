@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 
 from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, gerar_apk, verificar_ambiente_build
 from services.apk_jobs import criar_job, obter_job
+from services.auth import login_obrigatorio
 from services.branding import obter_branding
 
 
@@ -15,6 +16,7 @@ EXTENSOES_ICONE = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 @bp.get("/painel/gerar-apk")
+@login_obrigatorio
 def pagina_gerar_apk():
     esquema = request.headers.get("X-Forwarded-Proto", request.scheme)
     host = request.headers.get("X-Forwarded-Host", request.host)
@@ -28,11 +30,13 @@ def pagina_gerar_apk():
 
 
 @bp.get("/api/gerar-apk/verificar")
+@login_obrigatorio
 def api_verificar_ambiente():
     return jsonify(verificar_ambiente_build())
 
 
 @bp.post("/api/gerar-apk")
+@login_obrigatorio
 def api_gerar_apk():
     nome_app = request.form.get("nome_app", "").strip()
     url_servidor = request.form.get("url_servidor", "").strip()
@@ -86,6 +90,7 @@ def api_gerar_apk():
 
 
 @bp.get("/api/gerar-apk/status/<job_id>")
+@login_obrigatorio
 def api_status_gerar_apk(job_id):
     dados = obter_job(job_id)
     if not dados:
@@ -111,6 +116,7 @@ def api_status_gerar_apk(job_id):
 
 
 @bp.get("/download/apk/<path:nome_arquivo>")
+@login_obrigatorio
 def download_apk(nome_arquivo):
     if not nome_arquivo or ".." in nome_arquivo or "/" in nome_arquivo or "\\" in nome_arquivo:
         return jsonify({"erro": "arquivo invalido"}), 400

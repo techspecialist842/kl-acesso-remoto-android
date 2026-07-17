@@ -1,11 +1,13 @@
 from flask import Blueprint, render_template, jsonify
 from routes.dispositivos import dispositivos
 from routes.esqueleto import esqueletos
+from services.auth import login_obrigatorio
 
 bp = Blueprint("painel", __name__)
 
 
 @bp.get("/painel")
+@login_obrigatorio
 def index():
 
     lista = list(dispositivos.values())
@@ -17,6 +19,7 @@ def index():
 
 
 @bp.get("/painel/dispositivo/<id>")
+@login_obrigatorio
 def dispositivo(id):
 
     dados = dispositivos.get(id)
@@ -41,6 +44,7 @@ def dispositivo(id):
 
 
 @bp.get("/api/esqueleto/<id>")
+@login_obrigatorio
 def api_esqueleto(id):
 
     return jsonify(

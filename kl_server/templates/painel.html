@@ -44,12 +44,23 @@
 
 <h1>{{ branding.nome_marca }}</h1>
 <p style="color:#555;margin-top:-8px;">{{ branding.titulo_painel }}</p>
+{% if usuario_logado %}
+<p style="color:#555;font-size:14px;">
+    Logado: <strong>{{ usuario_logado.nome }}</strong>
+    {% if usuario_logado.is_admin %}(admin){% endif %}
+    — expira {{ usuario_logado.expira_em_fmt }}
+    <a href="/logout" style="margin-left:12px;">Sair</a>
+</p>
+{% endif %}
 
 <div class="card">
     <h2>{{ branding.titulo_gerar_apk }}</h2>
     <p>{{ branding.subtitulo_gerar_apk }}</p>
     <a class="botao" href="/painel/gerar-apk">{{ branding.texto_botao_apk }}</a>
+    {% if usuario_logado and usuario_logado.is_admin %}
     <a class="botao" href="/painel/personalizar" style="background:#1d4ed8;">Personalizar marca</a>
+    <a class="botao" href="/painel/usuarios" style="background:#047857;">Gerenciar usuarios</a>
+    {% endif %}
 </div>
 
 {% if dispositivos %}

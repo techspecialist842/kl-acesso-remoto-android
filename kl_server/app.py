@@ -7,15 +7,23 @@ from routes.painel import bp as painel_bp
 from routes.overlay import bp as overlay_bp
 from routes.apk import bp as apk_bp
 from routes.branding import bp as branding_bp
+from routes.auth import bp as auth_bp
+from routes.usuarios import bp as usuarios_bp
+from services.auth import configurar_app, sessao_atual
 
 
 app = Flask(__name__)
+configurar_app(app)
 
 
 @app.context_processor
-def injetar_branding():
+def injetar_contexto():
     from services.branding import obter_branding
-    return {"branding": obter_branding()}
+    usuario = sessao_atual()
+    return {
+        "branding": obter_branding(),
+        "usuario_logado": usuario if usuario and not usuario.get("expirado") else None,
+    }
 
 
 app.register_blueprint(dispositivos_bp)
@@ -25,6 +33,8 @@ app.register_blueprint(painel_bp)
 app.register_blueprint(overlay_bp)
 app.register_blueprint(apk_bp)
 app.register_blueprint(branding_bp)
+app.register_blueprint(auth_bp)
+app.register_blueprint(usuarios_bp)
 
 
 @app.get("/")

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - {{ branding.nome_marca }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            width: 100%;
+            max-width: 420px;
+            padding: 32px;
+            border-radius: 14px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+        }
+        h1 { margin: 0 0 8px; color: #0f172a; }
+        p { color: #64748b; margin-bottom: 24px; }
+        label { display: block; font-weight: 600; margin: 14px 0 6px; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            margin-top: 22px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #0f172a;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .erro {
+            background: #fdecec;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .info {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>{{ branding.nome_marca }}</h1>
+        <p>Area de login segura</p>
+
+        {% if erro %}
+        <div class="erro">{{ erro }}</div>
+        {% endif %}
+
+        <form method="post" action="/login">
+            <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+            <label for="usuario">Usuario</label>
+            <input id="usuario" name="usuario" type="text" value="{{ usuario or '' }}" required autofocus>
+
+            <label for="senha">Senha</label>
+            <input id="senha" name="senha" type="password" required>
+
+            <button type="submit">Entrar</button>
+        </form>
+
+        <div class="info">Planos: 7, 15 ou 30 dias. Acesso bloqueado apos vencimento.</div>
+    </div>
+</body>
+</html>
