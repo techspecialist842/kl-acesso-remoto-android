@@ -1,8 +1,9 @@
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, session
 
-from services.auth import admin_obrigatorio
+from services.auth import admin_obrigatorio, login_obrigatorio, sessao_atual
 from services.usuarios import (
     PLANOS_VALIDOS,
+    atualizar_credenciais_conta,
     atualizar_usuario,
     criar_usuario,
     excluir_usuario,
@@ -19,7 +20,34 @@ def pagina_usuarios():
         "usuarios.html",
         usuarios=listar_usuarios(),
         planos=sorted(PLANOS_VALIDOS),
+        usuario_logado=sessao_atual(),
     )
+
+
+@bp.get("/painel/minha-conta")
+@login_obrigatorio
+def pagina_minha_conta():
+    return render_template("minha_conta.html", usuario=sessao_atual())
+
+
+@bp.patch("/api/minha-conta")
+@login_obrigatorio
+def api_minha_conta():
+    usuario = sessao_atual()
+    dados = request.get_json(silent=True) or {}
+    try:
+        atualizado = atualizar_credenciais_conta(
+            usuario["id"],
+            usuario_login=dados.get("usuario"),
+            nome=dados.get("nome"),
+            senha_atual=dados.get("senha_atual"),
+            senha_nova=dados.get("senha_nova") or None,
+        )
+        if dados.get("usuario"):
+            session["usuario"] = atualizado["usuario"]
+        return jsonify({"status": "ok", "usuario": atualizado})
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
 
 
 @bp.get("/api/usuarios")

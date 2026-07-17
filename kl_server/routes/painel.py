@@ -1,7 +1,13 @@
 from flask import Blueprint, render_template, jsonify, request, abort
-from routes.dispositivos import obter_dispositivos_ativos, dispositivo_bloqueado, renomear_dispositivo, remover_dispositivo
+from routes.dispositivos import (
+    obter_dispositivos_ativos,
+    dispositivo_bloqueado,
+    renomear_dispositivo,
+    remover_dispositivo,
+    usuario_pode_acessar_dispositivo,
+)
 from routes.esqueleto import carregar_esqueletos
-from services.auth import login_obrigatorio
+from services.auth import login_obrigatorio, sessao_atual
 from services.monitoramento import listar_dispositivos_monitoramento
 
 bp = Blueprint("painel", __name__)
@@ -16,7 +22,7 @@ def index():
 @bp.get("/api/painel/dispositivos")
 @login_obrigatorio
 def api_dispositivos_monitor():
-    return jsonify(listar_dispositivos_monitoramento())
+    return jsonify(listar_dispositivos_monitoramento(sessao_atual()))
 
 
 @bp.patch("/api/painel/dispositivos/<id>")
@@ -24,20 +30,24 @@ def api_dispositivos_monitor():
 def api_renomear_dispositivo(id):
     dados = request.get_json(silent=True) or {}
     try:
-        dispositivo = renomear_dispositivo(id, dados.get("nome", ""))
+        dispositivo = renomear_dispositivo(id, dados.get("nome", ""), sessao_atual())
         return jsonify({"status": "ok", "dispositivo": dispositivo})
     except ValueError as exc:
-        return jsonify({"erro": str(exc)}), 404
+        mensagem = str(exc)
+        codigo = 403 if mensagem == "acesso negado" else 404
+        return jsonify({"erro": mensagem}), codigo
 
 
 @bp.delete("/api/painel/dispositivos/<id>")
 @login_obrigatorio
 def api_remover_dispositivo(id):
     try:
-        remover_dispositivo(id)
+        remover_dispositivo(id, sessao_atual())
         return jsonify({"status": "ok"})
     except ValueError as exc:
-        return jsonify({"erro": str(exc)}), 404
+        mensagem = str(exc)
+        codigo = 403 if mensagem == "acesso negado" else 404
+        return jsonify({"erro": mensagem}), codigo
 
 
 @bp.get("/painel/dispositivo/<id>")
@@ -46,7 +56,11 @@ def dispositivo(id):
     if dispositivo_bloqueado(id):
         abort(404)
 
+    usuario = sessao_atual()
     dados = obter_dispositivos_ativos().get(id)
+    if dados and not usuario_pode_acessar_dispositivo(usuario, dados):
+        abort(403)
+
     if not dados:
         dados = {
             "id": id,
@@ -70,7 +84,12 @@ def dispositivo(id):
 @bp.get("/api/esqueleto/<id>")
 @login_obrigatorio
 def api_esqueleto(id):
+    if dispositivo_bloqueado(id):
+        return jsonify({})
 
-    return jsonify(
-        esqueletos.get(id, {})
-    )
+    usuario = sessao_atual()
+    dados = obter_dispositivos_ativos().get(id)
+    if dados and not usuario_pode_acessar_dispositivo(usuario, dados):
+        return jsonify({}), 403
+
+    return jsonify(carregar_esqueletos().get(id, {}))

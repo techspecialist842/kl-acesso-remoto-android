@@ -44,7 +44,16 @@ def _salvar_job(job_id, dados):
         json.dump(dados, arquivo, ensure_ascii=False)
 
 
-def criar_job(nome_app, caminho_icone=None, url_servidor=None, titulo_notificacao=None, texto_notificacao=None):
+def criar_job(
+    nome_app,
+    caminho_icone=None,
+    url_servidor=None,
+    titulo_notificacao=None,
+    texto_notificacao=None,
+    usuario_id=None,
+    usuario_nome=None,
+    cadastro_adm=False,
+):
     _carregar_env_arquivo()
     os.makedirs(JOBS_DIR, exist_ok=True)
 
@@ -58,6 +67,9 @@ def criar_job(nome_app, caminho_icone=None, url_servidor=None, titulo_notificaca
         "url_servidor": url_servidor,
         "titulo_notificacao": titulo_notificacao,
         "texto_notificacao": texto_notificacao,
+        "usuario_id": usuario_id,
+        "usuario_nome": usuario_nome,
+        "cadastro_adm": bool(cadastro_adm),
         "erro": None,
         "resultado": None,
     }

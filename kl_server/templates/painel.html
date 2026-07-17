@@ -216,6 +216,22 @@
             line-height: 1.5;
         }
 
+        .badge-dono {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .badge-dono.adm {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
         .vazio {
             text-align: center;
             color: #64748b;
@@ -246,6 +262,7 @@
     <h2>{{ branding.titulo_gerar_apk }}</h2>
     <p>{{ branding.subtitulo_gerar_apk }}</p>
     <a class="botao" href="/painel/gerar-apk">{{ branding.texto_botao_apk }}</a>
+    <a class="botao" href="/painel/minha-conta" style="background:#7c3aed;">Minha conta</a>
     {% if usuario_logado and usuario_logado.is_admin %}
     <a class="botao" href="/painel/personalizar" style="background:#1d4ed8;">Personalizar marca</a>
     <a class="botao" href="/painel/usuarios" style="background:#047857;">Gerenciar usuarios</a>
@@ -276,6 +293,13 @@
     let primeiraCarga = true;
     const nomesEmEdicao = new Map();
     const idsRemovidosLocal = new Set();
+    let ehAdmin = false;
+
+    function badgeDono(item) {
+        if (!ehAdmin || !item.proprietario_label) return "";
+        const classe = item.cadastro_adm ? "badge-dono adm" : "badge-dono";
+        return `<span class="${classe}">${escapar(item.proprietario_label)}</span>`;
+    }
 
     function escapar(texto) {
         return String(texto ?? "")
@@ -316,6 +340,7 @@
                         ${escapar(item.fabricante || "-")} • Android ${escapar(item.android || "-")} • ${escapar(item.largura)}×${escapar(item.altura)}
                     </p>
                     <div class="item-id" title="${escapar(item.id)}">ID: ${escapar(item.id)}</div>
+                    ${badgeDono(item)}
                 </div>
                 <span class="status-badge ${statusClasse}">
                     <span class="ponto ${pontoClasse}"></span>
@@ -361,6 +386,21 @@
         if (titulo) {
             titulo.textContent = nomeExibicao;
             titulo.title = nomeExibicao;
+        }
+
+        const badge = card.querySelector(".badge-dono");
+        if (ehAdmin) {
+            const htmlBadge = badgeDono(item);
+            if (htmlBadge) {
+                if (badge) {
+                    badge.outerHTML = htmlBadge;
+                } else {
+                    const info = card.querySelector(".item-info-principal");
+                    if (info) info.insertAdjacentHTML("beforeend", htmlBadge);
+                }
+            } else if (badge) {
+                badge.remove();
+            }
         }
 
         if (meta) {
@@ -440,6 +480,7 @@
             const resposta = await fetch("/api/painel/dispositivos");
             if (!resposta.ok) return;
             const dados = await resposta.json();
+            ehAdmin = !!dados.eh_admin;
             const dispositivos = (dados.dispositivos || []).filter(function(item) {
                 return !idsRemovidosLocal.has(item.id);
             });

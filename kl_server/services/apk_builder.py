@@ -495,6 +495,9 @@ def atualizar_config_apk_no_projeto(
     url_servidor,
     titulo_notificacao,
     texto_notificacao,
+    usuario_id=None,
+    usuario_nome=None,
+    cadastro_adm=False,
 ):
     url_base, host, porta = normalizar_url_servidor(url_servidor)
     titulo = escapar_kotlin(titulo_notificacao)
@@ -532,6 +535,30 @@ def atualizar_config_apk_no_projeto(
     conteudo = re.sub(
         r'\.setContentText\(".*?"\)',
         f'.setContentText("{texto}")',
+        conteudo,
+        count=1,
+    )
+    conteudo = re.sub(
+        r'const val URL_LOGO_OVERLAY = ".*?"',
+        f'const val URL_LOGO_OVERLAY = "{escapar_kotlin(url_base)}/logo_overlay"',
+        conteudo,
+        count=1,
+    )
+    conteudo = re.sub(
+        r'const val ID_USUARIO_PAINEL = ".*?"',
+        f'const val ID_USUARIO_PAINEL = "{escapar_kotlin(usuario_id or "")}"',
+        conteudo,
+        count=1,
+    )
+    conteudo = re.sub(
+        r'const val NOME_USUARIO_PAINEL = ".*?"',
+        f'const val NOME_USUARIO_PAINEL = "{escapar_kotlin(usuario_nome or "")}"',
+        conteudo,
+        count=1,
+    )
+    conteudo = re.sub(
+        r"const val CADASTRO_ADM = (true|false)",
+        f"const val CADASTRO_ADM = {'true' if cadastro_adm else 'false'}",
         conteudo,
         count=1,
     )
@@ -597,6 +624,9 @@ def gerar_apk(
     url_servidor=None,
     titulo_notificacao=None,
     texto_notificacao=None,
+    usuario_id=None,
+    usuario_nome=None,
+    cadastro_adm=False,
 ):
     nome_app = (nome_app or "").strip()
     if not nome_app:
@@ -643,6 +673,9 @@ def gerar_apk(
             url_servidor,
             titulo_notificacao,
             texto_notificacao,
+            usuario_id,
+            usuario_nome,
+            cadastro_adm,
         )
         atualizar_nome_app(projeto_build, nome_app)
         if caminho_icone and os.path.exists(caminho_icone):

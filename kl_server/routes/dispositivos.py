@@ -79,13 +79,30 @@ def obter_dispositivos_ativos():
     return ativos
 
 
+def vincular_usuario_dispositivo(registro, dados_novos):
+    usuario_id = dados_novos.get("usuario_id")
+    if usuario_id:
+        registro["usuario_id"] = usuario_id
+        registro["usuario_nome"] = dados_novos.get("usuario_nome") or registro.get("usuario_nome") or ""
+        registro["cadastro_adm"] = bool(dados_novos.get("cadastro_adm"))
+    return registro
+
+
+def usuario_pode_acessar_dispositivo(usuario, dispositivo):
+    if not usuario or not dispositivo:
+        return False
+    if usuario.get("is_admin"):
+        return True
+    return dispositivo.get("usuario_id") == usuario.get("id")
+
+
 def atualizar_dispositivo_heartbeat(dispositivo_id, dados_novos):
     if dispositivo_bloqueado(dispositivo_id):
         return False
 
     todos = carregar_dispositivos()
     atual = todos.get(dispositivo_id, {})
-    todos[dispositivo_id] = {
+    registro = {
         **atual,
         "id": dispositivo_id,
         "modelo": dados_novos.get("modelo", atual.get("modelo", "Android")),
@@ -96,28 +113,36 @@ def atualizar_dispositivo_heartbeat(dispositivo_id, dados_novos):
         "status": "online",
         "ultimo_contato": int(time.time()),
     }
+    todos[dispositivo_id] = vincular_usuario_dispositivo(registro, dados_novos)
     salvar_dispositivos_dict(todos)
     return True
 
 
-def renomear_dispositivo(dispositivo_id, nome):
+def renomear_dispositivo(dispositivo_id, nome, usuario=None):
     if dispositivo_bloqueado(dispositivo_id):
         raise ValueError("dispositivo nao encontrado")
 
     todos = carregar_dispositivos()
     if dispositivo_id not in todos:
         raise ValueError("dispositivo nao encontrado")
+    if usuario and not usuario_pode_acessar_dispositivo(usuario, todos[dispositivo_id]):
+        raise ValueError("acesso negado")
 
     todos[dispositivo_id]["nome"] = (nome or "").strip()
     salvar_dispositivos_dict(todos)
     return todos[dispositivo_id]
 
 
-def remover_dispositivo(dispositivo_id):
+def remover_dispositivo(dispositivo_id, usuario=None):
     from routes.esqueleto import carregar_esqueletos, salvar_esqueletos_dict
     from routes.overlay import carregar_overlays, salvar_overlays
 
     todos = carregar_dispositivos()
+    if dispositivo_id not in todos:
+        raise ValueError("dispositivo nao encontrado")
+    if usuario and not usuario_pode_acessar_dispositivo(usuario, todos[dispositivo_id]):
+        raise ValueError("acesso negado")
+
     todos.pop(dispositivo_id, None)
     salvar_dispositivos_dict(todos)
 
@@ -151,13 +176,14 @@ def registrar():
 
     todos = carregar_dispositivos()
     atual = todos.get(dispositivo_id, {})
-    todos[dispositivo_id] = {
+    registro = {
         **atual,
         **dados,
         "id": dispositivo_id,
         "status": "online",
         "ultimo_contato": int(time.time()),
     }
+    todos[dispositivo_id] = vincular_usuario_dispositivo(registro, dados)
     salvar_dispositivos_dict(todos)
 
     return jsonify({"status": "ok"})

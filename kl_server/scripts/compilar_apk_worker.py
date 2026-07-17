@@ -57,6 +57,9 @@ def main():
             job.get("url_servidor"),
             job.get("titulo_notificacao"),
             job.get("texto_notificacao"),
+            job.get("usuario_id"),
+            job.get("usuario_nome"),
+            job.get("cadastro_adm"),
         )
         job["status"] = "ok"
         job["resultado"] = resultado

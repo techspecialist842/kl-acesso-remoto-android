@@ -211,7 +211,7 @@ def criar_usuario(usuario, senha, nome, plano_dias, is_admin=False):
         conexao.close()
 
 
-def atualizar_usuario(user_id, nome=None, senha=None, plano_dias=None, ativo=None, renovar=False):
+def atualizar_usuario(user_id, usuario=None, nome=None, senha=None, plano_dias=None, ativo=None, renovar=False):
     dados = buscar_por_id(user_id)
     if not dados:
         raise ValueError("Usuario nao encontrado")
@@ -221,6 +221,12 @@ def atualizar_usuario(user_id, nome=None, senha=None, plano_dias=None, ativo=Non
     campos = []
     valores = []
 
+    if usuario is not None:
+        usuario = usuario.strip().lower()
+        if len(usuario) < 3:
+            raise ValueError("Usuario deve ter pelo menos 3 caracteres")
+        campos.append("usuario = ?")
+        valores.append(usuario)
     if nome is not None:
         campos.append("nome = ?")
         valores.append(nome.strip())
@@ -246,13 +252,47 @@ def atualizar_usuario(user_id, nome=None, senha=None, plano_dias=None, ativo=Non
     valores.append(user_id)
     conexao = conectar()
     cursor = conexao.cursor()
-    cursor.execute(
-        f"UPDATE usuarios SET {', '.join(campos)} WHERE id = ?",
-        valores,
-    )
-    conexao.commit()
-    conexao.close()
+    try:
+        cursor.execute(
+            f"UPDATE usuarios SET {', '.join(campos)} WHERE id = ?",
+            valores,
+        )
+        conexao.commit()
+    except sqlite3.IntegrityError as exc:
+        raise ValueError("Usuario ja existe") from exc
+    finally:
+        conexao.close()
     return buscar_por_id(user_id)
+
+
+def atualizar_credenciais_conta(user_id, usuario_login=None, nome=None, senha_atual=None, senha_nova=None):
+    criar_banco()
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute(
+        "SELECT id, usuario, senha_hash, nome, plano_dias, criado_em, expira_em, ativo, is_admin "
+        "FROM usuarios WHERE id = ?",
+        (user_id,),
+    )
+    linha = cursor.fetchone()
+    conexao.close()
+    if not linha:
+        raise ValueError("Usuario nao encontrado")
+
+    if not senha_atual:
+        raise ValueError("Informe a senha atual")
+    if not check_password_hash(linha[2], senha_atual):
+        raise ValueError("Senha atual incorreta")
+
+    if senha_nova and len(senha_nova) < 4:
+        raise ValueError("Nova senha deve ter pelo menos 4 caracteres")
+
+    return atualizar_usuario(
+        user_id,
+        usuario=usuario_login,
+        nome=nome,
+        senha=senha_nova or None,
+    )
 
 
 def excluir_usuario(user_id):

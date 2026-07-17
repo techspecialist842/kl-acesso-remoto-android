@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 from services.apk_builder import APK_OUTPUT_DIR, ICON_UPLOAD_DIR, gerar_apk, verificar_ambiente_build
 from services.apk_jobs import criar_job, obter_job
-from services.auth import login_obrigatorio
+from services.auth import login_obrigatorio, sessao_atual
 from services.branding import obter_branding
 
 
@@ -68,12 +68,16 @@ def api_gerar_apk():
         arquivo_icone.save(caminho_icone)
 
     try:
+        usuario = sessao_atual()
         job_id = criar_job(
             nome_app,
             caminho_icone,
             url_servidor,
             titulo_notificacao,
             texto_notificacao,
+            usuario_id=usuario.get("id") if usuario else None,
+            usuario_nome=usuario.get("nome") if usuario else None,
+            cadastro_adm=bool(usuario and usuario.get("is_admin")),
         )
         return jsonify({
             "status": "processando",
