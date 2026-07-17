@@ -48,7 +48,10 @@ baixar "templates/personalizar.html"     "$BASE_URL/templates/personalizar.html"
 baixar "services/monitoramento.py"          "$BASE_URL/services/monitoramento.py"
 baixar "routes/painel.py"                   "$BASE_URL/routes/painel.py"
 baixar "routes/dispositivos.py"             "$BASE_URL/routes/dispositivos.py"
+baixar "routes/esqueleto.py"                "$BASE_URL/routes/esqueleto.py"
+baixar "routes/overlay.py"                  "$BASE_URL/routes/overlay.py"
 baixar "templates/painel.html"              "$BASE_URL/templates/painel.html"
+baixar "templates/minha_conta.html"         "$BASE_URL/templates/minha_conta.html"
 baixar "templates/dispositivo.html"      "$BASE_URL/templates/dispositivo.html"
 
 chmod +x scripts/setup_apk_builder.sh
@@ -60,5 +63,7 @@ chmod +x scripts/compilar_apk_worker.py
 
 echo ""
 echo "OK: arquivos atualizados em $KL_SERVER"
-echo "Proximo passo:"
-echo "  bash scripts/setup_apk_builder.sh"
+echo "Proximo passo (servidor):"
+echo "  cd /root/kl-acesso-remoto-android && git pull origin main"
+echo "  cd $KL_SERVER && bash scripts/setup_apk_builder.sh"
+echo "  pkill -f gunicorn || true && source venv/bin/activate && gunicorn -c gunicorn.conf.py app:app"
