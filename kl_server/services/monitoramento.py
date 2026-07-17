@@ -39,10 +39,10 @@ def _formatar_hora(timestamp):
 
 
 def listar_dispositivos_monitoramento():
-    from routes.dispositivos import dispositivos
+    from routes.dispositivos import obter_dispositivos_ativos
 
     agora = time.time()
-    lista = [enriquecer_dispositivo(d, agora) for d in dispositivos.values()]
+    lista = [enriquecer_dispositivo(d, agora) for d in obter_dispositivos_ativos().values()]
     lista.sort(
         key=lambda item: (
             item.get("ultimo_contato") or 0,

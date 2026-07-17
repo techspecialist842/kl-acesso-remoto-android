@@ -275,6 +275,7 @@
     const idsConhecidos = new Set();
     let primeiraCarga = true;
     const nomesEmEdicao = new Map();
+    const idsRemovidosLocal = new Set();
 
     function escapar(texto) {
         return String(texto ?? "")
@@ -420,6 +421,7 @@
                     if (!resposta.ok) throw new Error("Falha ao remover");
                     nomesEmEdicao.delete(id);
                     idsConhecidos.delete(id);
+                    idsRemovidosLocal.add(id);
                     card.remove();
                     if (!listaEl.querySelector(".item-dispositivo")) {
                         listaEl.innerHTML = '<div class="vazio">Nenhum dispositivo conectado.</div>';
@@ -438,11 +440,15 @@
             const resposta = await fetch("/api/painel/dispositivos");
             if (!resposta.ok) return;
             const dados = await resposta.json();
-            const dispositivos = dados.dispositivos || [];
+            const dispositivos = (dados.dispositivos || []).filter(function(item) {
+                return !idsRemovidosLocal.has(item.id);
+            });
 
-            document.getElementById("total-online").textContent = dados.total_online || 0;
-            document.getElementById("total-offline").textContent = dados.total_offline || 0;
-            document.getElementById("total-geral").textContent = dados.total || 0;
+            document.getElementById("total-online").textContent =
+                dispositivos.filter(function(item) { return item.online; }).length;
+            document.getElementById("total-offline").textContent =
+                dispositivos.filter(function(item) { return !item.online; }).length;
+            document.getElementById("total-geral").textContent = dispositivos.length;
 
             const agora = new Date();
             document.getElementById("ultima-atualizacao").textContent =

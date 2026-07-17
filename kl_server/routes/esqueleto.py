@@ -65,6 +65,14 @@ def salvar_esqueletos():
         )
 
 
+def salvar_esqueletos_dict(dados):
+    os.makedirs(os.path.dirname(CAMINHO_ESQUELETOS), exist_ok=True)
+    with open(CAMINHO_ESQUELETOS, "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo, ensure_ascii=False, indent=4)
+    global esqueletos
+    esqueletos = dados
+
+
 
 
 esqueletos = carregar_esqueletos()
@@ -99,8 +107,9 @@ def receber():
     if dispositivo_bloqueado(dispositivo_id):
         return jsonify({"status": "ignorado"})
 
-    esqueletos[dispositivo_id] = dados
-    salvar_esqueletos()
+    esqueletos_dados = carregar_esqueletos()
+    esqueletos_dados[dispositivo_id] = dados
+    salvar_esqueletos_dict(esqueletos_dados)
     atualizar_dispositivo_heartbeat(dispositivo_id, dados)
 
 

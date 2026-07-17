@@ -12,59 +12,29 @@ CAMINHO_DADOS = os.path.join(BASE_DIR, "data", "dispositivos.json")
 CAMINHO_REMOVIDOS = os.path.join(BASE_DIR, "data", "dispositivos_removidos.json")
 
 
-
 def carregar_dispositivos():
-
     if not os.path.exists(CAMINHO_DADOS):
         return {}
-
-
     try:
-
-        with open(
-            CAMINHO_DADOS,
-            "r",
-            encoding="utf-8"
-        ) as arquivo:
-
+        with open(CAMINHO_DADOS, "r", encoding="utf-8") as arquivo:
             dados = json.load(arquivo)
-
             if isinstance(dados, dict):
                 return dados
-
-
     except Exception:
-
         return {}
-
-
     return {}
 
 
+def salvar_dispositivos_dict(dados):
+    os.makedirs(os.path.dirname(CAMINHO_DADOS), exist_ok=True)
+    with open(CAMINHO_DADOS, "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo, ensure_ascii=False, indent=4)
+    global dispositivos
+    dispositivos = dados
 
 
 def salvar_dispositivos():
-
-    os.makedirs(
-        os.path.dirname(CAMINHO_DADOS),
-        exist_ok=True
-    )
-
-
-    with open(
-        CAMINHO_DADOS,
-        "w",
-        encoding="utf-8"
-    ) as arquivo:
-
-        json.dump(
-            dispositivos,
-            arquivo,
-            ensure_ascii=False,
-            indent=4
-        )
-
-
+    salvar_dispositivos_dict(dispositivos)
 
 
 def carregar_removidos():
@@ -80,10 +50,16 @@ def carregar_removidos():
     return set()
 
 
-def salvar_removidos(removidos):
+def salvar_removidos_set(bloqueados):
     os.makedirs(os.path.dirname(CAMINHO_REMOVIDOS), exist_ok=True)
     with open(CAMINHO_REMOVIDOS, "w", encoding="utf-8") as arquivo:
-        json.dump(sorted(removidos), arquivo, ensure_ascii=False, indent=4)
+        json.dump(sorted(bloqueados), arquivo, ensure_ascii=False, indent=4)
+    global removidos
+    removidos = bloqueados
+
+
+def salvar_removidos(bloqueados):
+    salvar_removidos_set(bloqueados)
 
 
 dispositivos = carregar_dispositivos()
@@ -91,15 +67,25 @@ removidos = carregar_removidos()
 
 
 def dispositivo_bloqueado(dispositivo_id):
-    return dispositivo_id in removidos
+    return dispositivo_id in carregar_removidos()
+
+
+def obter_dispositivos_ativos():
+    bloqueados = carregar_removidos()
+    dados = carregar_dispositivos()
+    ativos = {k: v for k, v in dados.items() if k not in bloqueados}
+    if len(ativos) != len(dados):
+        salvar_dispositivos_dict(ativos)
+    return ativos
 
 
 def atualizar_dispositivo_heartbeat(dispositivo_id, dados_novos):
     if dispositivo_bloqueado(dispositivo_id):
         return False
 
-    atual = dispositivos.get(dispositivo_id, {})
-    dispositivos[dispositivo_id] = {
+    todos = carregar_dispositivos()
+    atual = todos.get(dispositivo_id, {})
+    todos[dispositivo_id] = {
         **atual,
         "id": dispositivo_id,
         "modelo": dados_novos.get("modelo", atual.get("modelo", "Android")),
@@ -110,95 +96,73 @@ def atualizar_dispositivo_heartbeat(dispositivo_id, dados_novos):
         "status": "online",
         "ultimo_contato": int(time.time()),
     }
-    salvar_dispositivos()
+    salvar_dispositivos_dict(todos)
     return True
 
 
 def renomear_dispositivo(dispositivo_id, nome):
-    if dispositivo_id not in dispositivos:
+    if dispositivo_bloqueado(dispositivo_id):
         raise ValueError("dispositivo nao encontrado")
-    dispositivos[dispositivo_id]["nome"] = (nome or "").strip()
-    salvar_dispositivos()
-    return dispositivos[dispositivo_id]
+
+    todos = carregar_dispositivos()
+    if dispositivo_id not in todos:
+        raise ValueError("dispositivo nao encontrado")
+
+    todos[dispositivo_id]["nome"] = (nome or "").strip()
+    salvar_dispositivos_dict(todos)
+    return todos[dispositivo_id]
 
 
 def remover_dispositivo(dispositivo_id):
-    if dispositivo_id not in dispositivos:
-        raise ValueError("dispositivo nao encontrado")
-
-    from routes.esqueleto import esqueletos, salvar_esqueletos
+    from routes.esqueleto import carregar_esqueletos, salvar_esqueletos_dict
     from routes.overlay import carregar_overlays, salvar_overlays
 
-    dispositivos.pop(dispositivo_id, None)
-    salvar_dispositivos()
+    todos = carregar_dispositivos()
+    todos.pop(dispositivo_id, None)
+    salvar_dispositivos_dict(todos)
 
-    if dispositivo_id in esqueletos:
-        esqueletos.pop(dispositivo_id, None)
-        salvar_esqueletos()
+    bloqueados = carregar_removidos()
+    bloqueados.add(dispositivo_id)
+    salvar_removidos_set(bloqueados)
+
+    esqueletos_dados = carregar_esqueletos()
+    if dispositivo_id in esqueletos_dados:
+        esqueletos_dados.pop(dispositivo_id, None)
+        salvar_esqueletos_dict(esqueletos_dados)
 
     overlays = carregar_overlays()
     if dispositivo_id in overlays:
         overlays.pop(dispositivo_id, None)
         salvar_overlays(overlays)
 
-    removidos.add(dispositivo_id)
-    salvar_removidos(removidos)
-
 
 @bp.post("/registrar_dispositivo")
 def registrar():
-
-
     dados = request.get_json(silent=True)
-
-
     if not dados:
-
-        return jsonify({
-            "erro": "dados inválidos"
-        }), 400
-
-
+        return jsonify({"erro": "dados inválidos"}), 400
 
     dispositivo_id = dados.get("id")
-
-
     if not dispositivo_id:
-
-        return jsonify({
-            "erro": "id obrigatório"
-        }), 400
-
-
+        return jsonify({"erro": "id obrigatório"}), 400
 
     if dispositivo_bloqueado(dispositivo_id):
         return jsonify({"status": "ignorado"})
 
-    atual = dispositivos.get(dispositivo_id, {})
-    dispositivos[dispositivo_id] = {
+    todos = carregar_dispositivos()
+    atual = todos.get(dispositivo_id, {})
+    todos[dispositivo_id] = {
         **atual,
         **dados,
         "id": dispositivo_id,
         "status": "online",
         "ultimo_contato": int(time.time()),
     }
+    salvar_dispositivos_dict(todos)
 
-    salvar_dispositivos()
-
-
-
-    return jsonify({
-        "status": "ok"
-    })
-
-
-
+    return jsonify({"status": "ok"})
 
 
 @bp.get("/dispositivos")
 def listar():
-
-
-    return jsonify(
-        list(dispositivos.values())
-    )
+    return jsonify(list(obter_dispositivos_ativos().values()))

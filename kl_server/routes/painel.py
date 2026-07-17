@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, jsonify, request
-from routes.dispositivos import dispositivos, renomear_dispositivo, remover_dispositivo
-from routes.esqueleto import esqueletos
+from flask import Blueprint, render_template, jsonify, request, abort
+from routes.dispositivos import obter_dispositivos_ativos, dispositivo_bloqueado, renomear_dispositivo, remover_dispositivo
+from routes.esqueleto import carregar_esqueletos
 from services.auth import login_obrigatorio
 from services.monitoramento import listar_dispositivos_monitoramento
 
@@ -43,8 +43,10 @@ def api_remover_dispositivo(id):
 @bp.get("/painel/dispositivo/<id>")
 @login_obrigatorio
 def dispositivo(id):
+    if dispositivo_bloqueado(id):
+        abort(404)
 
-    dados = dispositivos.get(id)
+    dados = obter_dispositivos_ativos().get(id)
     if not dados:
         dados = {
             "id": id,
@@ -56,7 +58,7 @@ def dispositivo(id):
             "status": "offline",
         }
 
-    esqueleto = esqueletos.get(id, {})
+    esqueleto = carregar_esqueletos().get(id, {})
 
     return render_template(
         "dispositivo.html",
