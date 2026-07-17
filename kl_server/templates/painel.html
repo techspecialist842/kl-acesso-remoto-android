@@ -496,7 +496,10 @@
                 `Atualizado as ${agora.toLocaleTimeString("pt-BR")}`;
 
             if (dispositivos.length === 0) {
-                listaEl.innerHTML = '<div class="vazio">Nenhum dispositivo conectado.</div>';
+                const msgVazio = ehAdmin
+                    ? "Nenhum dispositivo conectado."
+                    : "Nenhum dispositivo. Gere um APK estando logado nesta conta, instale no celular e ative o servico de acessibilidade.";
+                listaEl.innerHTML = `<div class="vazio">${msgVazio}</div>`;
                 idsConhecidos.clear();
                 primeiraCarga = false;
                 return;

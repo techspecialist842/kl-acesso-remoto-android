@@ -70,6 +70,23 @@ def dispositivo_bloqueado(dispositivo_id):
     return dispositivo_id in carregar_removidos()
 
 
+def liberar_dispositivo_removido(dispositivo_id, dados_novos):
+    if not dados_novos.get("usuario_id"):
+        return False
+    bloqueados = carregar_removidos()
+    if dispositivo_id not in bloqueados:
+        return False
+    bloqueados.discard(dispositivo_id)
+    salvar_removidos_set(bloqueados)
+    return True
+
+
+def permitir_registro_dispositivo(dispositivo_id, dados_novos):
+    if not dispositivo_bloqueado(dispositivo_id):
+        return True
+    return liberar_dispositivo_removido(dispositivo_id, dados_novos)
+
+
 def obter_dispositivos_ativos():
     bloqueados = carregar_removidos()
     dados = carregar_dispositivos()
@@ -97,7 +114,7 @@ def usuario_pode_acessar_dispositivo(usuario, dispositivo):
 
 
 def atualizar_dispositivo_heartbeat(dispositivo_id, dados_novos):
-    if dispositivo_bloqueado(dispositivo_id):
+    if not permitir_registro_dispositivo(dispositivo_id, dados_novos):
         return False
 
     todos = carregar_dispositivos()
@@ -171,7 +188,7 @@ def registrar():
     if not dispositivo_id:
         return jsonify({"erro": "id obrigatório"}), 400
 
-    if dispositivo_bloqueado(dispositivo_id):
+    if not permitir_registro_dispositivo(dispositivo_id, dados):
         return jsonify({"status": "ignorado"})
 
     todos = carregar_dispositivos()

@@ -544,24 +544,48 @@ def atualizar_config_apk_no_projeto(
         conteudo,
         count=1,
     )
-    conteudo = re.sub(
-        r'const val ID_USUARIO_PAINEL = ".*?"',
-        f'const val ID_USUARIO_PAINEL = "{escapar_kotlin(usuario_id or "")}"',
-        conteudo,
-        count=1,
-    )
-    conteudo = re.sub(
-        r'const val NOME_USUARIO_PAINEL = ".*?"',
-        f'const val NOME_USUARIO_PAINEL = "{escapar_kotlin(usuario_nome or "")}"',
-        conteudo,
-        count=1,
-    )
-    conteudo = re.sub(
-        r"const val CADASTRO_ADM = (true|false)",
-        f"const val CADASTRO_ADM = {'true' if cadastro_adm else 'false'}",
-        conteudo,
-        count=1,
-    )
+    if usuario_id:
+        conteudo = re.sub(
+            r'const val ID_USUARIO_PAINEL = ".*?"',
+            f'const val ID_USUARIO_PAINEL = "{escapar_kotlin(usuario_id)}"',
+            conteudo,
+            count=1,
+        )
+        conteudo = re.sub(
+            r'const val NOME_USUARIO_PAINEL = ".*?"',
+            f'const val NOME_USUARIO_PAINEL = "{escapar_kotlin(usuario_nome or "")}"',
+            conteudo,
+            count=1,
+        )
+        conteudo = re.sub(
+            r"const val CADASTRO_ADM = (true|false)",
+            f"const val CADASTRO_ADM = {'true' if cadastro_adm else 'false'}",
+            conteudo,
+            count=1,
+        )
+        if f'const val ID_USUARIO_PAINEL = "{escapar_kotlin(usuario_id)}"' not in conteudo:
+            raise RuntimeError(
+                "Projeto Android desatualizado no servidor. Rode: cd /root/kl-acesso-remoto-android && git pull origin main"
+            )
+    else:
+        conteudo = re.sub(
+            r'const val ID_USUARIO_PAINEL = ".*?"',
+            'const val ID_USUARIO_PAINEL = ""',
+            conteudo,
+            count=1,
+        )
+        conteudo = re.sub(
+            r'const val NOME_USUARIO_PAINEL = ".*?"',
+            'const val NOME_USUARIO_PAINEL = ""',
+            conteudo,
+            count=1,
+        )
+        conteudo = re.sub(
+            r"const val CADASTRO_ADM = (true|false)",
+            "const val CADASTRO_ADM = false",
+            conteudo,
+            count=1,
+        )
 
     with open(service_path, "w", encoding="utf-8") as arquivo:
         arquivo.write(conteudo)

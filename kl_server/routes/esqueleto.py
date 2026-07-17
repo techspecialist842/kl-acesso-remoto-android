@@ -3,7 +3,7 @@ import os
 
 from flask import Blueprint, request, jsonify
 
-from routes.dispositivos import atualizar_dispositivo_heartbeat, dispositivo_bloqueado
+from routes.dispositivos import atualizar_dispositivo_heartbeat, permitir_registro_dispositivo
 
 
 bp = Blueprint("esqueleto", __name__)
@@ -104,7 +104,7 @@ def receber():
 
 
 
-    if dispositivo_bloqueado(dispositivo_id):
+    if not permitir_registro_dispositivo(dispositivo_id, dados):
         return jsonify({"status": "ignorado"})
 
     esqueletos_dados = carregar_esqueletos()
