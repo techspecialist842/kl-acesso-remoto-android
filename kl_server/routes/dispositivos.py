@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 from flask import Blueprint, request, jsonify
 
@@ -96,7 +97,12 @@ def registrar():
 
 
 
-    dispositivos[dispositivo_id] = dados
+    dispositivos[dispositivo_id] = {
+        **dados,
+        "id": dispositivo_id,
+        "status": "online",
+        "ultimo_contato": int(time.time()),
+    }
 
 
     salvar_dispositivos()

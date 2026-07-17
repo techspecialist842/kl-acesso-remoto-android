@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify
 from routes.dispositivos import dispositivos
 from routes.esqueleto import esqueletos
 from services.auth import login_obrigatorio
+from services.monitoramento import listar_dispositivos_monitoramento
 
 bp = Blueprint("painel", __name__)
 
@@ -9,13 +10,13 @@ bp = Blueprint("painel", __name__)
 @bp.get("/painel")
 @login_obrigatorio
 def index():
+    return render_template("painel.html")
 
-    lista = list(dispositivos.values())
 
-    return render_template(
-        "painel.html",
-        dispositivos=lista
-    )
+@bp.get("/api/painel/dispositivos")
+@login_obrigatorio
+def api_dispositivos_monitor():
+    return jsonify(listar_dispositivos_monitoramento())
 
 
 @bp.get("/painel/dispositivo/<id>")

@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ branding.nome_marca }}</title>
 
     <style>
@@ -11,9 +12,7 @@
             padding: 30px;
         }
 
-        h1 {
-            color: #222;
-        }
+        h1 { color: #222; margin-bottom: 4px; }
 
         .card {
             background: white;
@@ -23,19 +22,123 @@
             box-shadow: 0 2px 10px #0002;
         }
 
-        .online {
-            color: green;
-            font-weight: bold;
-        }
-
         .botao {
             display: inline-block;
             margin-top: 15px;
+            margin-right: 8px;
             padding: 10px 18px;
             background: #222;
             color: white;
             text-decoration: none;
             border-radius: 8px;
+        }
+
+        .monitor-topo {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .monitor-topo h2 { margin: 0; }
+
+        .resumo {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .chip-verde { background: #dcfce7; color: #166534; }
+        .chip-vermelho { background: #fee2e2; color: #991b1b; }
+        .chip-cinza { background: #e2e8f0; color: #334155; }
+
+        .ponto {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .ponto-verde { background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.2); }
+        .ponto-vermelho { background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.15); }
+
+        .lista-dispositivos {
+            display: grid;
+            gap: 14px;
+        }
+
+        .item-dispositivo {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            background: #fff;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+
+        .item-dispositivo.novo {
+            border-color: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34,197,94,0.15);
+            animation: destaqueNovo 1.2s ease;
+        }
+
+        @keyframes destaqueNovo {
+            0% { transform: scale(1.02); background: #f0fdf4; }
+            100% { transform: scale(1); background: #fff; }
+        }
+
+        .item-cabecalho {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .item-cabecalho h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .status-online { background: #dcfce7; color: #166534; }
+        .status-offline { background: #fee2e2; color: #991b1b; }
+
+        .meta {
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .vazio {
+            text-align: center;
+            color: #64748b;
+            padding: 30px 10px;
+        }
+
+        .atualizacao {
+            font-size: 13px;
+            color: #64748b;
         }
     </style>
 </head>
@@ -63,53 +166,111 @@
     {% endif %}
 </div>
 
-{% if dispositivos %}
-
-    {% for dispositivo in dispositivos %}
-
-    <div class="card">
-
-        <h2>{{ dispositivo.modelo }}</h2>
-
-        <p>
-            Fabricante:
-            {{ dispositivo.fabricante }}
-        </p>
-
-        <p>
-            Android:
-            {{ dispositivo.android }}
-        </p>
-
-        <p>
-            Resolucao:
-            {{ dispositivo.largura }} x {{ dispositivo.altura }}
-        </p>
-
-        <p class="online">
-            Online
-        </p>
-
-        <p>
-            ID:
-            {{ dispositivo.id }}
-        </p>
-
-        <a class="botao" href="/painel/dispositivo/{{ dispositivo.id }}">
-            Abrir dispositivo
-        </a>
-
+<div class="card">
+    <div class="monitor-topo">
+        <div>
+            <h2>Monitoramento em Tempo Real</h2>
+            <div class="atualizacao" id="ultima-atualizacao">Atualizando...</div>
+        </div>
+        <div class="resumo">
+            <span class="chip chip-verde"><span class="ponto ponto-verde"></span> <span id="total-online">0</span> online</span>
+            <span class="chip chip-vermelho"><span class="ponto ponto-vermelho"></span> <span id="total-offline">0</span> offline</span>
+            <span class="chip chip-cinza"><span id="total-geral">0</span> total</span>
+        </div>
     </div>
 
-    {% endfor %}
-
-{% else %}
-
-<div class="card">
-    Nenhum dispositivo conectado.
+    <div class="lista-dispositivos" id="lista-dispositivos">
+        <div class="vazio">Carregando dispositivos...</div>
+    </div>
 </div>
 
-{% endif %}
+<script>
+    const listaEl = document.getElementById("lista-dispositivos");
+    const idsConhecidos = new Set();
+    let primeiraCarga = true;
+
+    function escapar(texto) {
+        return String(texto ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function renderizarDispositivo(item, ehNovo) {
+        const online = item.online;
+        const classeNovo = ehNovo ? " novo" : "";
+        const statusClasse = online ? "status-online" : "status-offline";
+        const statusTexto = online ? "Online" : "Offline";
+        const pontoClasse = online ? "ponto-verde" : "ponto-vermelho";
+        const tempo = online
+            ? "Ativo agora"
+            : (item.segundos_atras != null ? `Offline ha ${item.segundos_atras}s` : "Sem contato");
+
+        return `
+            <div class="item-dispositivo${classeNovo}" data-id="${escapar(item.id)}">
+                <div class="item-cabecalho">
+                    <h3>${escapar(item.modelo || "Dispositivo")}</h3>
+                    <span class="status-badge ${statusClasse}">
+                        <span class="ponto ${pontoClasse}"></span>
+                        ${statusTexto}
+                    </span>
+                </div>
+                <div class="meta">
+                    Fabricante: ${escapar(item.fabricante || "-")}<br>
+                    Android: ${escapar(item.android || "-")}<br>
+                    Resolucao: ${escapar(item.largura)} x ${escapar(item.altura)}<br>
+                    ID: ${escapar(item.id)}<br>
+                    Ultimo contato: ${escapar(item.ultimo_contato_fmt)} (${escapar(tempo)})
+                </div>
+                <a class="botao" href="/painel/dispositivo/${encodeURIComponent(item.id)}">Abrir dispositivo</a>
+            </div>
+        `;
+    }
+
+    async function atualizarMonitor() {
+        try {
+            const resposta = await fetch("/api/painel/dispositivos");
+            if (!resposta.ok) return;
+            const dados = await resposta.json();
+            const dispositivos = dados.dispositivos || [];
+
+            document.getElementById("total-online").textContent = dados.total_online || 0;
+            document.getElementById("total-offline").textContent = dados.total_offline || 0;
+            document.getElementById("total-geral").textContent = dados.total || 0;
+
+            const agora = new Date();
+            document.getElementById("ultima-atualizacao").textContent =
+                `Atualizado as ${agora.toLocaleTimeString("pt-BR")}`;
+
+            if (dispositivos.length === 0) {
+                listaEl.innerHTML = '<div class="vazio">Nenhum dispositivo conectado.</div>';
+                idsConhecidos.clear();
+                primeiraCarga = false;
+                return;
+            }
+
+            const novosIds = new Set();
+            let html = "";
+
+            for (const item of dispositivos) {
+                novosIds.add(item.id);
+                const ehNovo = !primeiraCarga && !idsConhecidos.has(item.id);
+                html += renderizarDispositivo(item, ehNovo);
+            }
+
+            listaEl.innerHTML = html;
+            idsConhecidos.clear();
+            novosIds.forEach((id) => idsConhecidos.add(id));
+            primeiraCarga = false;
+        } catch (erro) {
+            console.log("Erro monitor:", erro);
+        }
+    }
+
+    atualizarMonitor();
+    setInterval(atualizarMonitor, 3000);
+</script>
 
 </body>
 </html>

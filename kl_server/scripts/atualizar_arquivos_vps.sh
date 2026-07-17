@@ -45,7 +45,10 @@ baixar "templates/usuarios.html"          "$BASE_URL/templates/usuarios.html"
 baixar "services/branding.py"            "$BASE_URL/services/branding.py"
 baixar "templates/gerar_apk.html"        "$BASE_URL/templates/gerar_apk.html"
 baixar "templates/personalizar.html"     "$BASE_URL/templates/personalizar.html"
-baixar "templates/painel.html"           "$BASE_URL/templates/painel.html"
+baixar "services/monitoramento.py"          "$BASE_URL/services/monitoramento.py"
+baixar "routes/painel.py"                   "$BASE_URL/routes/painel.py"
+baixar "routes/dispositivos.py"             "$BASE_URL/routes/dispositivos.py"
+baixar "templates/painel.html"              "$BASE_URL/templates/painel.html"
 baixar "templates/dispositivo.html"      "$BASE_URL/templates/dispositivo.html"
 
 chmod +x scripts/setup_apk_builder.sh
