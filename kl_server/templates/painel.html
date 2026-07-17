@@ -76,13 +76,14 @@
 
         .lista-dispositivos {
             display: grid;
-            gap: 14px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 12px;
         }
 
         .item-dispositivo {
             border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: 10px;
+            padding: 12px 14px;
             background: #fff;
             transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
         }
@@ -98,36 +99,121 @@
             100% { transform: scale(1); background: #fff; }
         }
 
-        .item-cabecalho {
+        .item-topo {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 10px;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
         }
 
-        .item-cabecalho h3 {
+        .item-info-principal {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .item-titulo {
+            margin: 0 0 4px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #111827;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item-subtitulo {
             margin: 0;
-            font-size: 18px;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .item-id {
+            margin-top: 4px;
+            color: #94a3b8;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .status-badge {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
+            gap: 6px;
+            padding: 4px 10px;
             border-radius: 999px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
+            flex-shrink: 0;
         }
 
         .status-online { background: #dcfce7; color: #166534; }
         .status-offline { background: #fee2e2; color: #991b1b; }
 
-        .meta {
+        .campo-renomear {
+            margin-top: 10px;
+        }
+
+        .campo-renomear label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
             color: #64748b;
-            font-size: 14px;
-            line-height: 1.6;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .campo-renomear input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .campo-renomear input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+        }
+
+        .acoes-dispositivo {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .btn-acao {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn-abrir { background: #222; color: #fff; }
+        .btn-salvar-nome { background: #1d4ed8; color: #fff; }
+        .btn-remover { background: #fee2e2; color: #991b1b; }
+
+        .btn-acao:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .meta-compacta {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.5;
         }
 
         .vazio {
@@ -188,6 +274,7 @@
     const listaEl = document.getElementById("lista-dispositivos");
     const idsConhecidos = new Set();
     let primeiraCarga = true;
+    const nomesEmEdicao = new Map();
 
     function escapar(texto) {
         return String(texto ?? "")
@@ -197,35 +284,153 @@
             .replace(/"/g, "&quot;");
     }
 
-    function renderizarDispositivo(item, ehNovo) {
+    function idCss(valor) {
+        return String(valor).replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function textoTempo(item) {
+        if (item.online) return "Ativo agora";
+        if (item.segundos_atras != null) return `Offline ha ${item.segundos_atras}s`;
+        return "Sem contato";
+    }
+
+    function criarCard(item, ehNovo) {
         const online = item.online;
         const classeNovo = ehNovo ? " novo" : "";
         const statusClasse = online ? "status-online" : "status-offline";
         const statusTexto = online ? "Online" : "Offline";
         const pontoClasse = online ? "ponto-verde" : "ponto-vermelho";
-        const tempo = online
-            ? "Ativo agora"
-            : (item.segundos_atras != null ? `Offline ha ${item.segundos_atras}s` : "Sem contato");
-
-        return `
-            <div class="item-dispositivo${classeNovo}" data-id="${escapar(item.id)}">
-                <div class="item-cabecalho">
-                    <h3>${escapar(item.modelo || "Dispositivo")}</h3>
-                    <span class="status-badge ${statusClasse}">
-                        <span class="ponto ${pontoClasse}"></span>
-                        ${statusTexto}
-                    </span>
+        const nomeAtual = nomesEmEdicao.has(item.id)
+            ? nomesEmEdicao.get(item.id)
+            : (item.nome || "");
+        const titulo = item.nome_exibicao || item.modelo || "Dispositivo";
+        const card = document.createElement("div");
+        card.className = `item-dispositivo${classeNovo}`;
+        card.dataset.id = item.id;
+        card.innerHTML = `
+            <div class="item-topo">
+                <div class="item-info-principal">
+                    <h3 class="item-titulo" title="${escapar(titulo)}">${escapar(titulo)}</h3>
+                    <p class="item-subtitulo">
+                        ${escapar(item.fabricante || "-")} • Android ${escapar(item.android || "-")} • ${escapar(item.largura)}×${escapar(item.altura)}
+                    </p>
+                    <div class="item-id" title="${escapar(item.id)}">ID: ${escapar(item.id)}</div>
                 </div>
-                <div class="meta">
-                    Fabricante: ${escapar(item.fabricante || "-")}<br>
-                    Android: ${escapar(item.android || "-")}<br>
-                    Resolucao: ${escapar(item.largura)} x ${escapar(item.altura)}<br>
-                    ID: ${escapar(item.id)}<br>
-                    Ultimo contato: ${escapar(item.ultimo_contato_fmt)} (${escapar(tempo)})
-                </div>
-                <a class="botao" href="/painel/dispositivo/${encodeURIComponent(item.id)}">Abrir dispositivo</a>
+                <span class="status-badge ${statusClasse}">
+                    <span class="ponto ${pontoClasse}"></span>
+                    ${statusTexto}
+                </span>
+            </div>
+            <div class="meta-compacta">${escapar(textoTempo(item))} • ${escapar(item.ultimo_contato_fmt)}</div>
+            <div class="campo-renomear">
+                <label for="nome-${idCss(item.id)}">Nome no painel</label>
+                <input
+                    id="nome-${idCss(item.id)}"
+                    type="text"
+                    value="${escapar(nomeAtual)}"
+                    placeholder="${escapar(item.modelo || "Dispositivo")}"
+                    data-id="${escapar(item.id)}"
+                >
+            </div>
+            <div class="acoes-dispositivo">
+                <a class="btn-acao btn-abrir" href="/painel/dispositivo/${encodeURIComponent(item.id)}">Abrir</a>
+                <button class="btn-acao btn-salvar-nome" type="button" data-id="${escapar(item.id)}">Salvar nome</button>
+                <button class="btn-acao btn-remover" type="button" data-id="${escapar(item.id)}">Remover</button>
             </div>
         `;
+        return card;
+    }
+
+    function atualizarCard(card, item) {
+        const online = item.online;
+        const statusBadge = card.querySelector(".status-badge");
+        const titulo = card.querySelector(".item-titulo");
+        const meta = card.querySelector(".meta-compacta");
+        const inputNome = card.querySelector(".campo-renomear input");
+
+        if (statusBadge) {
+            statusBadge.className = `status-badge ${online ? "status-online" : "status-offline"}`;
+            statusBadge.innerHTML = `
+                <span class="ponto ${online ? "ponto-verde" : "ponto-vermelho"}"></span>
+                ${online ? "Online" : "Offline"}
+            `;
+        }
+
+        const nomeExibicao = item.nome_exibicao || item.modelo || "Dispositivo";
+        if (titulo) {
+            titulo.textContent = nomeExibicao;
+            titulo.title = nomeExibicao;
+        }
+
+        if (meta) {
+            meta.textContent = `${textoTempo(item)} • ${item.ultimo_contato_fmt || "-"}`;
+        }
+
+        if (inputNome && document.activeElement !== inputNome && !nomesEmEdicao.has(item.id)) {
+            inputNome.value = item.nome || "";
+        }
+    }
+
+    function configurarAcoes() {
+        listaEl.addEventListener("input", function(evento) {
+            const campo = evento.target.closest(".campo-renomear input");
+            if (!campo) return;
+            nomesEmEdicao.set(campo.dataset.id, campo.value);
+        });
+
+        listaEl.addEventListener("click", async function(evento) {
+            const botaoSalvar = evento.target.closest(".btn-salvar-nome");
+            const botaoRemover = evento.target.closest(".btn-remover");
+
+            if (botaoSalvar) {
+                const card = botaoSalvar.closest(".item-dispositivo");
+                const input = card ? card.querySelector(".campo-renomear input") : null;
+                if (!input) return;
+                const id = card.dataset.id;
+                botaoSalvar.disabled = true;
+                try {
+                    const resposta = await fetch(`/api/painel/dispositivos/${encodeURIComponent(id)}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ nome: input.value })
+                    });
+                    if (!resposta.ok) throw new Error("Falha ao salvar");
+                    nomesEmEdicao.delete(id);
+                    await atualizarMonitor();
+                } catch (erro) {
+                    alert("Nao foi possivel salvar o nome.");
+                } finally {
+                    botaoSalvar.disabled = false;
+                }
+                return;
+            }
+
+            if (botaoRemover) {
+                const card = botaoRemover.closest(".item-dispositivo");
+                if (!card) return;
+                const id = card.dataset.id;
+                const titulo = card.querySelector(".item-titulo");
+                const nome = titulo ? titulo.textContent : id;
+                if (!confirm(`Remover "${nome}" do painel?`)) return;
+                botaoRemover.disabled = true;
+                try {
+                    const resposta = await fetch(`/api/painel/dispositivos/${encodeURIComponent(id)}`, {
+                        method: "DELETE"
+                    });
+                    if (!resposta.ok) throw new Error("Falha ao remover");
+                    nomesEmEdicao.delete(id);
+                    idsConhecidos.delete(id);
+                    card.remove();
+                    if (!listaEl.querySelector(".item-dispositivo")) {
+                        listaEl.innerHTML = '<div class="vazio">Nenhum dispositivo conectado.</div>';
+                    }
+                    await atualizarMonitor();
+                } catch (erro) {
+                    alert("Nao foi possivel remover o dispositivo.");
+                    botaoRemover.disabled = false;
+                }
+            }
+        });
     }
 
     async function atualizarMonitor() {
@@ -250,16 +455,29 @@
                 return;
             }
 
-            const novosIds = new Set();
-            let html = "";
+            const vazio = listaEl.querySelector(".vazio");
+            if (vazio) vazio.remove();
 
+            const novosIds = new Set();
             for (const item of dispositivos) {
                 novosIds.add(item.id);
+                let card = Array.from(listaEl.querySelectorAll(".item-dispositivo"))
+                    .find((el) => el.dataset.id === item.id);
                 const ehNovo = !primeiraCarga && !idsConhecidos.has(item.id);
-                html += renderizarDispositivo(item, ehNovo);
+                if (!card) {
+                    card = criarCard(item, ehNovo);
+                    listaEl.appendChild(card);
+                } else {
+                    atualizarCard(card, item);
+                }
             }
 
-            listaEl.innerHTML = html;
+            listaEl.querySelectorAll(".item-dispositivo").forEach(function(card) {
+                if (!novosIds.has(card.dataset.id)) {
+                    card.remove();
+                }
+            });
+
             idsConhecidos.clear();
             novosIds.forEach((id) => idsConhecidos.add(id));
             primeiraCarga = false;
@@ -268,6 +486,7 @@
         }
     }
 
+    configurarAcoes();
     atualizarMonitor();
     setInterval(atualizarMonitor, 3000);
 </script>

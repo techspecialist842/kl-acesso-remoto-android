@@ -1,10 +1,9 @@
 import json
 import os
-import time
 
 from flask import Blueprint, request, jsonify
 
-from routes.dispositivos import dispositivos, salvar_dispositivos
+from routes.dispositivos import atualizar_dispositivo_heartbeat, dispositivo_bloqueado
 
 
 bp = Blueprint("esqueleto", __name__)
@@ -97,52 +96,12 @@ def receber():
 
 
 
+    if dispositivo_bloqueado(dispositivo_id):
+        return jsonify({"status": "ignorado"})
+
     esqueletos[dispositivo_id] = dados
-
-
     salvar_esqueletos()
-
-
-
-    dispositivos[dispositivo_id] = {
-
-        "id": dispositivo_id,
-
-        "modelo": dados.get(
-            "modelo",
-            "Android"
-        ),
-
-        "fabricante": dados.get(
-            "fabricante",
-            ""
-        ),
-
-        "android": dados.get(
-            "android",
-            ""
-        ),
-
-        "largura": dados.get(
-            "largura",
-            0
-        ),
-
-        "altura": dados.get(
-            "altura",
-            0
-        ),
-
-        "status": "online",
-
-        "ultimo_contato": int(
-            time.time()
-        )
-
-    }
-
-
-    salvar_dispositivos()
+    atualizar_dispositivo_heartbeat(dispositivo_id, dados)
 
 
     return jsonify({

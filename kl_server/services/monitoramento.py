@@ -11,6 +11,13 @@ def dispositivo_online(dados, agora=None):
     return (agora - ultimo) <= ONLINE_LIMITE_SEGUNDOS
 
 
+def nome_exibicao(dados):
+    nome = (dados.get("nome") or "").strip()
+    if nome:
+        return nome
+    return dados.get("modelo") or "Dispositivo"
+
+
 def enriquecer_dispositivo(dados, agora=None):
     agora = agora or time.time()
     online = dispositivo_online(dados, agora)
@@ -18,6 +25,7 @@ def enriquecer_dispositivo(dados, agora=None):
     segundos_atras = int(agora - ultimo) if ultimo else None
     return {
         **dados,
+        "nome_exibicao": nome_exibicao(dados),
         "online": online,
         "status": "online" if online else "offline",
         "segundos_atras": segundos_atras,

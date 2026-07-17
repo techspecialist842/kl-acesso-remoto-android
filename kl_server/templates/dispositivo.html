@@ -686,7 +686,7 @@
     <div class="topbar">
         <div class="topbar-esquerda">
             <h1>{{ branding.titulo_espelho }}</h1>
-            <p>{{ branding.nome_marca }} • {{ dispositivo.modelo }} • Android {{ dispositivo.android }} • {{ dispositivo.largura }} × {{ dispositivo.altura }}</p>
+            <p>{{ branding.nome_marca }} • {{ dispositivo.nome or dispositivo.modelo }} • Android {{ dispositivo.android }} • {{ dispositivo.largura }} × {{ dispositivo.altura }}</p>
         </div>
         <div class="topbar-direita">
             <span class="status-online">🟢 online</span>

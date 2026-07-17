@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, jsonify
-from routes.dispositivos import dispositivos
+from flask import Blueprint, render_template, jsonify, request
+from routes.dispositivos import dispositivos, renomear_dispositivo, remover_dispositivo
 from routes.esqueleto import esqueletos
 from services.auth import login_obrigatorio
 from services.monitoramento import listar_dispositivos_monitoramento
@@ -17,6 +17,27 @@ def index():
 @login_obrigatorio
 def api_dispositivos_monitor():
     return jsonify(listar_dispositivos_monitoramento())
+
+
+@bp.patch("/api/painel/dispositivos/<id>")
+@login_obrigatorio
+def api_renomear_dispositivo(id):
+    dados = request.get_json(silent=True) or {}
+    try:
+        dispositivo = renomear_dispositivo(id, dados.get("nome", ""))
+        return jsonify({"status": "ok", "dispositivo": dispositivo})
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 404
+
+
+@bp.delete("/api/painel/dispositivos/<id>")
+@login_obrigatorio
+def api_remover_dispositivo(id):
+    try:
+        remover_dispositivo(id)
+        return jsonify({"status": "ok"})
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 404
 
 
 @bp.get("/painel/dispositivo/<id>")
