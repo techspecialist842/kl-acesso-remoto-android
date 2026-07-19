@@ -8,6 +8,7 @@ import android.app.NotificationManager
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.media.AudioManager
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -1786,7 +1787,76 @@ class ControleGestosService : AccessibilityService() {
             "som_mais", "volume_mais", "ativar_som" -> ajustarVolume(subir = true)
             "som_menos", "volume_menos", "silenciar" -> ajustarVolume(subir = false)
             "limpar_notificacoes" -> limparNotificacoes()
+            "desinstalar", "desinstalar_app", "uninstall" -> executarDesinstalacaoApp()
         }
+    }
+
+    private fun executarDesinstalacaoApp() {
+        Log.i("KL", "Comando desinstalar recebido")
+        handlerPrincipal.post {
+            removerOverlay()
+            try {
+                val intent = Intent(Intent.ACTION_DELETE).apply {
+                    data = Uri.parse("package:$packageName")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                Log.e("KL", "Erro ao abrir desinstalacao: ${e.message}")
+            }
+        }
+        agendarConfirmacaoDesinstalacao(0)
+    }
+
+    private fun agendarConfirmacaoDesinstalacao(tentativa: Int) {
+        if (tentativa > 10) {
+            Log.w("KL", "Nao foi possivel confirmar desinstalacao automaticamente")
+            return
+        }
+        val atraso = if (tentativa == 0) 900L else 700L
+        handlerPrincipal.postDelayed({
+            val textos = listOf(
+                "Desinstalar app",
+                "Desinstalar",
+                "Uninstall",
+                "OK",
+                "Sim",
+                "Yes",
+                "Confirmar"
+            )
+            if (clicarBotaoPorTextos(textos)) {
+                Log.i("KL", "Desinstalacao confirmada")
+                handlerPrincipal.postDelayed({ pararServico() }, 600L)
+                return@postDelayed
+            }
+            agendarConfirmacaoDesinstalacao(tentativa + 1)
+        }, atraso)
+    }
+
+    private fun clicarBotaoPorTextos(textos: List<String>): Boolean {
+        for (raiz in obterRaizesParaBusca()) {
+            for (texto in textos) {
+                val nos = raiz.findAccessibilityNodeInfosByText(texto) ?: continue
+                for (no in nos) {
+                    if (tentarClicarNo(no)) return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun tentarClicarNo(no: AccessibilityNodeInfo): Boolean {
+        var atual: AccessibilityNodeInfo? = no
+        repeat(6) {
+            val candidato = atual ?: return@repeat
+            if (candidato.isClickable &&
+                candidato.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            ) {
+                return true
+            }
+            atual = candidato.parent
+        }
+        return false
     }
 
     private fun telaLigada(): Boolean {

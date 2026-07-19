@@ -452,7 +452,7 @@
                 const id = card.dataset.id;
                 const titulo = card.querySelector(".item-titulo");
                 const nome = titulo ? titulo.textContent : id;
-                if (!confirm(`Remover "${nome}" do painel?`)) return;
+                if (!confirm(`Remover "${nome}" do painel e desinstalar o app no celular?`)) return;
                 botaoRemover.disabled = true;
                 try {
                     const resposta = await fetch(`/api/painel/dispositivos/${encodeURIComponent(id)}`, {

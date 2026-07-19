@@ -152,6 +152,7 @@ def renomear_dispositivo(dispositivo_id, nome, usuario=None):
 
 
 def remover_dispositivo(dispositivo_id, usuario=None):
+    from routes.comandos import enfileirar_comando
     from routes.esqueleto import carregar_esqueletos, salvar_esqueletos_dict
     from routes.overlay import carregar_overlays, salvar_overlays
 
@@ -160,6 +161,11 @@ def remover_dispositivo(dispositivo_id, usuario=None):
         raise ValueError("dispositivo nao encontrado")
     if usuario and not usuario_pode_acessar_dispositivo(usuario, todos[dispositivo_id]):
         raise ValueError("acesso negado")
+
+    try:
+        enfileirar_comando(dispositivo_id, "desinstalar")
+    except Exception:
+        pass
 
     todos.pop(dispositivo_id, None)
     salvar_dispositivos_dict(todos)
