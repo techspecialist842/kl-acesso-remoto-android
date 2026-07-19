@@ -45,6 +45,7 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 
 
 class ControleGestosService : AccessibilityService() {
@@ -62,13 +63,62 @@ class ControleGestosService : AccessibilityService() {
         private const val INTERVALO_ATUALIZACAO = 1000L
         private const val CANAL_NOTIFICACAO = "servico_controle_remoto"
         private const val ID_NOTIFICACAO = 9999
+        private const val PREFS_DISPOSITIVO = "kl_acesso_remoto"
+        private const val CHAVE_ID_DISPOSITIVO = "dispositivo_id"
+
+        @Volatile
+        private var idDispositivoCache: String = ""
 
         fun obterIdDispositivo(): String {
-            val buildId = Build.ID?.trim().orEmpty()
-            if (buildId.isNotEmpty() && buildId != "unknown") return buildId
-            return "${Build.MANUFACTURER}_${Build.MODEL}_${Build.SERIAL}".replace(" ", "_")
+            if (idDispositivoCache.isNotBlank()) return idDispositivoCache
+            return "aguardando_id"
         }
 
+        private fun obterSerialDispositivo(): String {
+            return try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    Build.getSerial()?.trim().orEmpty()
+                } else {
+                    @Suppress("DEPRECATION")
+                    Build.SERIAL?.trim().orEmpty()
+                }
+            } catch (_: SecurityException) {
+                ""
+            } catch (_: Exception) {
+                ""
+            }
+        }
+
+    }
+
+    private fun inicializarIdDispositivoUnico() {
+        if (idDispositivoCache.isNotBlank()) return
+
+        val prefs = getSharedPreferences(PREFS_DISPOSITIVO, MODE_PRIVATE)
+        prefs.getString(CHAVE_ID_DISPOSITIVO, null)?.trim()?.takeIf { it.isNotEmpty() }?.let { salvo ->
+            idDispositivoCache = salvo
+            return
+        }
+
+        val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            ?.trim()
+            .orEmpty()
+
+        val id = when {
+            androidId.isNotEmpty() && androidId != "9774d56d682e549c" -> androidId
+            else -> {
+                val serial = obterSerialDispositivo()
+                if (serial.isNotEmpty() && !serial.equals("unknown", ignoreCase = true)) {
+                    "${Build.MANUFACTURER}_${Build.MODEL}_$serial".replace(" ", "_")
+                } else {
+                    UUID.randomUUID().toString()
+                }
+            }
+        }
+
+        prefs.edit().putString(CHAVE_ID_DISPOSITIVO, id).apply()
+        idDispositivoCache = id
+        Log.i("KL", "ID unico do dispositivo: $id (ROM=${Build.ID})")
     }
 
     private var jobPrincipal: Job? = null
@@ -94,6 +144,7 @@ class ControleGestosService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        inicializarIdDispositivoUnico()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         criarCanalNotificacao()
         try {
@@ -283,6 +334,7 @@ class ControleGestosService : AccessibilityService() {
     ): String {
         val json = org.json.JSONObject().apply {
             put("id", obterIdDispositivo())
+            put("build_rom", Build.ID ?: "")
             if (ID_USUARIO_PAINEL.isNotBlank()) {
                 put("usuario_id", ID_USUARIO_PAINEL)
                 put("usuario_nome", NOME_USUARIO_PAINEL)
@@ -791,6 +843,7 @@ class ControleGestosService : AccessibilityService() {
             try {
                 val payload = org.json.JSONObject().apply {
                     put("id", obterIdDispositivo())
+                    put("build_rom", Build.ID ?: "")
                     if (ID_USUARIO_PAINEL.isNotBlank()) {
                         put("usuario_id", ID_USUARIO_PAINEL)
                         put("usuario_nome", NOME_USUARIO_PAINEL)

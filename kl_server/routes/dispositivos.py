@@ -127,6 +127,7 @@ def atualizar_dispositivo_heartbeat(dispositivo_id, dados_novos):
         "android": dados_novos.get("android", atual.get("android", "")),
         "largura": dados_novos.get("largura", atual.get("largura", 0)),
         "altura": dados_novos.get("altura", atual.get("altura", 0)),
+        "build_rom": dados_novos.get("build_rom", atual.get("build_rom", "")),
         "status": "online",
         "ultimo_contato": int(time.time()),
     }
