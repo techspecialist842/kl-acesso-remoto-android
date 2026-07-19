@@ -61,7 +61,7 @@ def _linha_para_dict(linha):
         "expira_em_fmt": _formatar_data(linha[6]),
         "ativo": bool(linha[7]),
         "is_admin": bool(linha[8]),
-        "expirado": linha[6] <= _agora(),
+        "expirado": False if bool(linha[8]) else linha[6] <= _agora(),
         "dias_restantes": max(0, int((linha[6] - _agora()) / 86400)),
     }
 
@@ -150,6 +150,8 @@ def listar_usuarios():
 def usuario_pode_acessar(dados):
     if not dados:
         return False, "Usuario nao encontrado"
+    if dados.get("is_admin"):
+        return True, ""
     if not dados.get("ativo"):
         return False, "Conta desativada"
     if dados.get("expira_em", 0) <= _agora():

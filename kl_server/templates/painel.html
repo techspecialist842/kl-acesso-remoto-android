@@ -252,8 +252,7 @@
 {% if usuario_logado %}
 <p style="color:#555;font-size:14px;">
     Logado: <strong>{{ usuario_logado.nome }}</strong>
-    {% if usuario_logado.is_admin %}(admin){% endif %}
-    — expira {{ usuario_logado.expira_em_fmt }}
+    {% if usuario_logado.is_admin %}(admin){% else %} — expira {{ usuario_logado.expira_em_fmt }}{% endif %}
     <a href="/logout" style="margin-left:12px;">Sair</a>
 </p>
 {% endif %}

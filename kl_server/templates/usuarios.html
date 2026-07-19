@@ -87,7 +87,7 @@
                     <td>{{ u.usuario }}{% if u.is_admin %} (admin){% endif %}</td>
                     <td>{{ u.nome }}</td>
                     <td>{{ u.plano_dias }} dias</td>
-                    <td>{{ u.expira_em_fmt }}</td>
+                    <td>{% if u.is_admin %}Permanente{% else %}{{ u.expira_em_fmt }}{% endif %}</td>
                     <td>
                         {% if u.expirado %}
                         <span class="badge off">Expirado</span>
