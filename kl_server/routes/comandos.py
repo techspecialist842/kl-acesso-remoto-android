@@ -51,6 +51,22 @@ def criar_banco():
 
 
 
+def enfileirar_comando(dispositivo, comando):
+    criar_banco()
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute(
+        """
+        INSERT INTO comandos (dispositivo, comando)
+        VALUES (?, ?)
+        """,
+        (dispositivo, comando),
+    )
+    conexao.commit()
+    conexao.close()
+
+
+
 criar_banco()
 
 
