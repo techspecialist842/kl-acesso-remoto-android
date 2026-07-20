@@ -20,9 +20,17 @@ configurar_app(app)
 def injetar_contexto():
     from services.branding import obter_branding
     usuario = sessao_atual()
+    if usuario and not usuario.get("expirado"):
+        usuario = dict(usuario)
+        if usuario.get("is_admin"):
+            usuario["sufixo_login"] = " (admin)"
+        else:
+            usuario["sufixo_login"] = f" — expira {usuario.get('expira_em_fmt', '-')}"
+    else:
+        usuario = None
     return {
         "branding": obter_branding(),
-        "usuario_logado": usuario if usuario and not usuario.get("expirado") else None,
+        "usuario_logado": usuario,
     }
 
 
